@@ -17,22 +17,16 @@ from app import create_app
 from middleware.system_user import ACCESS_TOKEN_HEADER, require_admin, require_user
 from pydantic import TypeAdapter
 from schema.agent.events import (
-    AgentEventTypeSchema,
-    AgentEventSchema,
     AgentInputPartTypeSchema,
-    DoneEvent,
+    AgentStreamFrameTypeSchema,
+    AgentStreamFrameSchema,
+    AgentTimelineAttachmentTypeSchema,
+    AgentTimelineItemTypeSchema,
     MAX_AGENT_IMAGES,
     MAX_AGENT_IMAGE_BYTES,
     MAX_AGENT_TOTAL_IMAGE_BYTES,
-    RunStateEvent,
 )
-from schema.agent.subordinates import AgentSubordinateTaskToolItem, AgentSubordinateTaskToolResult
-from schema.common.tool_results import ReportToolResultOutputSchema, ToolResultSchema
 from schema.knowledge.resources import KNOWLEDGE_DOCUMENT_INFLIGHT_STATUSES
-from schema.sandbox.command_outputs import (
-    SandboxCommandOutputChunk,
-    SandboxCommandResultMetadata,
-)
 from schema.work_project.graph import RELATION_TYPE_CATEGORY
 from service.common.pagination import RESOURCE_PAGE_SIZE
 from service.knowledge.constants import (
@@ -272,17 +266,11 @@ def _register_extra_schemas(schema: dict[str, Any]) -> None:
     schemas = components.setdefault("schemas", {})
 
     extras = {
-        "AgentEventTypeSchema": AgentEventTypeSchema,
         "AgentInputPartTypeSchema": AgentInputPartTypeSchema,
-        "DoneEvent": DoneEvent,
-        "RunStateEvent": RunStateEvent,
-        "AgentEventSchema": AgentEventSchema,
-        "AgentSubordinateTaskToolItem": AgentSubordinateTaskToolItem,
-        "AgentSubordinateTaskToolResult": AgentSubordinateTaskToolResult,
-        "ToolResultSchema": ToolResultSchema,
-        "ReportToolResultOutputSchema": ReportToolResultOutputSchema,
-        "SandboxCommandResultMetadata": SandboxCommandResultMetadata,
-        "SandboxCommandOutputChunk": SandboxCommandOutputChunk,
+        "AgentStreamFrameTypeSchema": AgentStreamFrameTypeSchema,
+        "AgentStreamFrameSchema": AgentStreamFrameSchema,
+        "AgentTimelineAttachmentTypeSchema": AgentTimelineAttachmentTypeSchema,
+        "AgentTimelineItemTypeSchema": AgentTimelineItemTypeSchema,
     }
     for name, model in extras.items():
         body = TypeAdapter(model).json_schema(ref_template="#/components/schemas/{model}")

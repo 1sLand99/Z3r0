@@ -33,7 +33,7 @@ _STATUS_MONITOR_INTERVAL_SECONDS = 5
 _STATUS_MONITOR_BATCH_SIZE = 32
 _TOOL_BINDING_INSPECT_TTL_SECONDS = 3
 _status_monitor_task: asyncio.Task[None] | None = None
-_tool_invalidation_tasks: set[asyncio.Task[None]] = set()
+_tool_invalidation_tasks: dict[int, asyncio.Task[None]] = {}
 _tool_binding_state_cache: dict[int, "DockerStateCacheEntry"] = {}
 _AgentToolBindingInvalidator = Callable[[int | None], Awaitable[None]]
 _agent_tool_binding_invalidator: _AgentToolBindingInvalidator | None = None
@@ -90,6 +90,16 @@ def _clear_tool_binding_state_cache(container_id: int | None = None) -> None:
     _tool_binding_state_cache.pop(container_id, None)
 
 
+def _prune_tool_binding_state_cache(now: float) -> None:
+    expired_ids = [
+        container_id
+        for container_id, entry in _tool_binding_state_cache.items()
+        if entry.expires_at <= now
+    ]
+    for container_id in expired_ids:
+        _tool_binding_state_cache.pop(container_id, None)
+
+
 async def inspect_container_state_cached(
     *,
     id: int,
@@ -98,6 +108,7 @@ async def inspect_container_state_cached(
     generation: int,
 ) -> DockerContainerState:
     now = time.monotonic()
+    _prune_tool_binding_state_cache(now)
     cached = _tool_binding_state_cache.get(id)
     if (
         cached is not None
@@ -129,12 +140,22 @@ def _schedule_agent_tool_invalidation(container_id: int) -> None:
         logger.debug("no running loop for agent tool invalidation: %s", container_id)
         return
 
+    current = _tool_invalidation_tasks.get(container_id)
+    if current is not None and not current.done():
+        return
     task = loop.create_task(
         invalidate_agent_tool_bindings(container_id),
         name=f"agent-tool-invalidate-{container_id}",
     )
-    _tool_invalidation_tasks.add(task)
-    task.add_done_callback(_tool_invalidation_tasks.discard)
+    _tool_invalidation_tasks[container_id] = task
+    task.add_done_callback(
+        lambda completed, target=container_id: _discard_tool_invalidation_task(target, completed)
+    )
+
+
+def _discard_tool_invalidation_task(container_id: int, task: asyncio.Task[None]) -> None:
+    if _tool_invalidation_tasks.get(container_id) is task:
+        _tool_invalidation_tasks.pop(container_id, None)
 
 
 async def invalidate_agent_tool_bindings(container_id: int) -> None:
@@ -149,7 +170,7 @@ async def invalidate_agent_tool_bindings(container_id: int) -> None:
 async def _invalidate_all_agent_tool_bindings() -> None:
     _clear_tool_binding_state_cache()
     if _tool_invalidation_tasks:
-        await asyncio.gather(*tuple(_tool_invalidation_tasks), return_exceptions=True)
+        await asyncio.gather(*tuple(_tool_invalidation_tasks.values()), return_exceptions=True)
     try:
         if _agent_tool_binding_invalidator is not None:
             await _agent_tool_binding_invalidator(None)
@@ -243,10 +264,11 @@ async def start_sandbox_container_status_monitor() -> None:
 async def stop_sandbox_container_status_monitor() -> None:
     global _status_monitor_task
     task, _status_monitor_task = _status_monitor_task, None
-    if task is None or task.done():
+    if task is None:
         await _drain_tool_invalidation_tasks()
         return
-    task.cancel()
+    if not task.done():
+        task.cancel()
     try:
         await task
     except asyncio.CancelledError:
@@ -260,7 +282,7 @@ async def invalidate_all_agent_tool_bindings() -> None:
 
 
 async def _drain_tool_invalidation_tasks() -> None:
-    tasks = tuple(_tool_invalidation_tasks)
+    tasks = tuple(_tool_invalidation_tasks.values())
     if not tasks:
         return
     await asyncio.gather(*tasks, return_exceptions=True)

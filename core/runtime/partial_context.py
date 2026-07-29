@@ -76,9 +76,10 @@ def incomplete_segment_events(
 
     Must be called **before** ``discard_partial_stream`` (which clears
     *buffers*). The returned events should be published to the live
-    bus so that ``LiveEventProjection`` promotes in-flight deltas to
-    completed entries, making WS snapshots reliable on reconnect even
-    though the partial text is not persisted to history.
+    bus so that ``LiveEventProjection`` promotes in-flight deltas to durable
+    completed timeline entries, making snapshots and history reliable on
+    reconnect. The abandoned partial response is still excluded from SDK
+    conversation memory.
     """
     now = datetime.now()
     events: list[AgentEventSchema] = []

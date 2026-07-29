@@ -89,23 +89,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/agent-sessions/{session_id}/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Agent Events Route */
-        get: operations["list_agent_events_route_api_agent_sessions__session_id__events_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/agent-sessions/{session_id}/interrupt": {
         parameters: {
             query?: never;
@@ -138,6 +121,23 @@ export interface paths {
         head?: never;
         /** Update Agent Session Sandbox Container Route */
         patch: operations["update_agent_session_sandbox_container_route_api_agent_sessions__session_id__sandbox_container_patch"];
+        trace?: never;
+    };
+    "/api/agent-sessions/{session_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agent Timeline Route */
+        get: operations["list_agent_timeline_route_api_agent_sessions__session_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/agent-sessions/{session_id}/title": {
@@ -1158,12 +1158,6 @@ export interface components {
              */
             use_responses: boolean;
         };
-        AgentEventSchema: components["schemas"]["UserMessageEvent"] | components["schemas"]["TurnBoundaryEvent"] | components["schemas"]["RunStateEvent"] | components["schemas"]["TextDeltaEvent"] | components["schemas"]["TextCompleteEvent"] | components["schemas"]["ThinkingDeltaEvent"] | components["schemas"]["ThinkingCompleteEvent"] | components["schemas"]["ToolCallEvent"] | components["schemas"]["ToolResultEvent"] | components["schemas"]["SubagentTaskEvent"] | components["schemas"]["DoneEvent"] | components["schemas"]["ErrorEvent"];
-        /**
-         * AgentEventTypeSchema
-         * @enum {string}
-         */
-        AgentEventTypeSchema: "user_message" | "turn_boundary" | "run_state" | "thinking_delta" | "thinking_complete" | "text_delta" | "text_complete" | "tool_call" | "tool_result" | "subagent_task" | "done" | "error";
         /**
          * AgentImageDetailSchema
          * @enum {string}
@@ -1357,71 +1351,67 @@ export interface components {
              */
             updated_at: string;
         };
+        AgentStreamFrameSchema: components["schemas"]["AgentStreamSnapshotFrame"] | components["schemas"]["AgentStreamItemUpsertFrame"] | components["schemas"]["AgentStreamTextAppendFrame"] | components["schemas"]["AgentStreamRunStateFrame"];
+        /**
+         * AgentStreamFrameTypeSchema
+         * @enum {string}
+         */
+        AgentStreamFrameTypeSchema: "snapshot" | "item_upsert" | "text_append" | "run_state";
+        /** AgentStreamItemUpsertFrame */
+        AgentStreamItemUpsertFrame: {
+            /** Item */
+            item: components["schemas"]["AgentTimelineUserMessageItem"] | components["schemas"]["AgentTimelineTurnBoundaryItem"] | components["schemas"]["AgentTimelineThinkingItem"] | components["schemas"]["AgentTimelineTextItem"] | components["schemas"]["AgentTimelineToolItem"] | components["schemas"]["AgentTimelineSubagentItem"] | components["schemas"]["AgentTimelineErrorItem"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "item_upsert";
+        };
+        /** AgentStreamRunStateFrame */
+        AgentStreamRunStateFrame: {
+            /** Main Agent Running */
+            main_agent_running: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "run_state";
+        };
+        /** AgentStreamSnapshotFrame */
+        AgentStreamSnapshotFrame: {
+            /** Items */
+            items: (components["schemas"]["AgentTimelineUserMessageItem"] | components["schemas"]["AgentTimelineTurnBoundaryItem"] | components["schemas"]["AgentTimelineThinkingItem"] | components["schemas"]["AgentTimelineTextItem"] | components["schemas"]["AgentTimelineToolItem"] | components["schemas"]["AgentTimelineSubagentItem"] | components["schemas"]["AgentTimelineErrorItem"])[];
+            /** Latest Sequence */
+            latest_sequence: number;
+            /** Main Agent Running */
+            main_agent_running: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "snapshot";
+        };
+        /** AgentStreamTextAppendFrame */
+        AgentStreamTextAppendFrame: {
+            /** Delta */
+            delta: string;
+            /** Item Id */
+            item_id: string;
+            /** Revision */
+            revision: number;
+            /** Sequence */
+            sequence: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "text_append";
+        };
         /**
          * AgentSubordinateStatus
          * @enum {string}
          */
         AgentSubordinateStatus: "running" | "completed" | "failed" | "canceled";
-        /** AgentSubordinateTaskToolItem */
-        AgentSubordinateTaskToolItem: {
-            /** Agent Code */
-            agent_code: string;
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /**
-             * Error
-             * @default
-             */
-            error: string;
-            /**
-             * Error Chars
-             * @default 0
-             */
-            error_chars: number;
-            /**
-             * Next Offset
-             * @default null
-             */
-            next_offset: number | null;
-            /**
-             * Progress
-             * @default
-             */
-            progress: string;
-            /**
-             * Result
-             * @default
-             */
-            result: string;
-            /**
-             * Result Chars
-             * @default 0
-             */
-            result_chars: number;
-            /** Run Id */
-            run_id: string;
-            status: components["schemas"]["AgentSubordinateStatus"];
-            /**
-             * Work Item Id
-             * @default null
-             */
-            work_item_id: number | null;
-        };
-        /** AgentSubordinateTaskToolResult */
-        AgentSubordinateTaskToolResult: {
-            /**
-             * Message
-             * @default
-             */
-            message: string;
-            /** @default null */
-            task: components["schemas"]["AgentSubordinateTaskToolItem"] | null;
-            /** Tasks */
-            tasks?: components["schemas"]["AgentSubordinateTaskToolItem"][];
-        };
         /** AgentTextInputPart */
         AgentTextInputPart: {
             /** Text */
@@ -1431,6 +1421,319 @@ export interface components {
              * @enum {string}
              */
             type: "text";
+        };
+        /**
+         * AgentTimelineAttachmentTypeSchema
+         * @enum {string}
+         */
+        AgentTimelineAttachmentTypeSchema: "report";
+        /**
+         * AgentTimelineContentStateSchema
+         * @enum {string}
+         */
+        AgentTimelineContentStateSchema: "streaming" | "completed";
+        /** AgentTimelineErrorItem */
+        AgentTimelineErrorItem: {
+            /**
+             * Agent Name
+             * @default
+             */
+            agent_name: string;
+            /**
+             * Code
+             * @default
+             */
+            code: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Item Id */
+            item_id: string;
+            /** Message */
+            message: string;
+            /** Parent Item Id */
+            parent_item_id?: string | null;
+            /** Revision */
+            revision: number;
+            /** Sequence */
+            sequence: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "error";
+        };
+        /**
+         * AgentTimelineItemTypeSchema
+         * @enum {string}
+         */
+        AgentTimelineItemTypeSchema: "user_message" | "turn_boundary" | "thinking" | "text" | "tool" | "subagent" | "error";
+        /** AgentTimelineReportAttachment */
+        AgentTimelineReportAttachment: {
+            /** Chars */
+            chars: number;
+            /** Filename */
+            filename: string;
+            /** Report Id */
+            report_id: string;
+            /** Size */
+            size: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "report";
+        };
+        /** AgentTimelineSubagentItem */
+        AgentTimelineSubagentItem: {
+            /** Agent Code */
+            agent_code: string;
+            /**
+             * Agent Name
+             * @default
+             */
+            agent_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Error Chars
+             * @default 0
+             */
+            error_chars: number;
+            /**
+             * Error Preview
+             * @default
+             */
+            error_preview: string;
+            /** Item Id */
+            item_id: string;
+            /**
+             * Parent Agent Code
+             * @default
+             */
+            parent_agent_code: string;
+            /**
+             * Parent Agent Instance Id
+             * @default
+             */
+            parent_agent_instance_id: string;
+            /** Parent Item Id */
+            parent_item_id?: string | null;
+            /**
+             * Progress
+             * @default
+             */
+            progress: string;
+            /**
+             * Result Chars
+             * @default 0
+             */
+            result_chars: number;
+            /**
+             * Result Preview
+             * @default
+             */
+            result_preview: string;
+            /** Revision */
+            revision: number;
+            /** Run Id */
+            run_id: string;
+            /** Sequence */
+            sequence: number;
+            status: components["schemas"]["AgentSubordinateStatus"];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "subagent";
+        };
+        /** AgentTimelineTextItem */
+        AgentTimelineTextItem: {
+            /**
+             * Agent Name
+             * @default
+             */
+            agent_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Item Id */
+            item_id: string;
+            /** Parent Item Id */
+            parent_item_id?: string | null;
+            /** Revision */
+            revision: number;
+            /** Sequence */
+            sequence: number;
+            /** @default streaming */
+            state: components["schemas"]["AgentTimelineContentStateSchema"];
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "text";
+        };
+        /** AgentTimelineThinkingItem */
+        AgentTimelineThinkingItem: {
+            /**
+             * Agent Name
+             * @default
+             */
+            agent_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Item Id */
+            item_id: string;
+            /** Parent Item Id */
+            parent_item_id?: string | null;
+            /** Revision */
+            revision: number;
+            /** Sequence */
+            sequence: number;
+            /** @default streaming */
+            state: components["schemas"]["AgentTimelineContentStateSchema"];
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "thinking";
+        };
+        /** AgentTimelineToolItem */
+        AgentTimelineToolItem: {
+            /**
+             * Agent Name
+             * @default
+             */
+            agent_name: string;
+            /** Arguments */
+            arguments?: {
+                [key: string]: unknown;
+            };
+            /** Attachments */
+            attachments?: components["schemas"]["AgentTimelineReportAttachment"][];
+            /** Call Id */
+            call_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Item Id */
+            item_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Output
+             * @default
+             */
+            output: string;
+            /** Parent Item Id */
+            parent_item_id?: string | null;
+            /** Revision */
+            revision: number;
+            /** Sequence */
+            sequence: number;
+            /** @default pending */
+            state: components["schemas"]["AgentTimelineToolStateSchema"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "tool";
+        };
+        /**
+         * AgentTimelineToolStateSchema
+         * @enum {string}
+         */
+        AgentTimelineToolStateSchema: "pending" | "completed" | "failed";
+        /** AgentTimelineTurnBoundaryItem */
+        AgentTimelineTurnBoundaryItem: {
+            /**
+             * Agent Name
+             * @default
+             */
+            agent_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Item Id */
+            item_id: string;
+            /** Parent Item Id */
+            parent_item_id?: string | null;
+            /** Revision */
+            revision: number;
+            /** Sequence */
+            sequence: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "turn_boundary";
+        };
+        /** AgentTimelineUserMessageItem */
+        AgentTimelineUserMessageItem: {
+            /**
+             * Agent Name
+             * @default
+             */
+            agent_name: string;
+            /** Content */
+            content: (components["schemas"]["AgentTextInputPart"] | components["schemas"]["AgentImageInputPart"])[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Display Text
+             * @default
+             */
+            display_text: string;
+            /** Item Id */
+            item_id: string;
+            /** Parent Item Id */
+            parent_item_id?: string | null;
+            /** Revision */
+            revision: number;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Target Agent Code
+             * @default
+             */
+            target_agent_code: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "user_message";
         };
         /** AgentTurnRequest */
         AgentTurnRequest: {
@@ -1443,11 +1746,13 @@ export interface components {
         };
         /** AgentTurnResponse */
         AgentTurnResponse: {
-            /** Events */
-            events: (components["schemas"]["UserMessageEvent"] | components["schemas"]["TurnBoundaryEvent"] | components["schemas"]["RunStateEvent"] | components["schemas"]["TextDeltaEvent"] | components["schemas"]["TextCompleteEvent"] | components["schemas"]["ThinkingDeltaEvent"] | components["schemas"]["ThinkingCompleteEvent"] | components["schemas"]["ToolCallEvent"] | components["schemas"]["ToolResultEvent"] | components["schemas"]["SubagentTaskEvent"] | components["schemas"]["DoneEvent"] | components["schemas"]["ErrorEvent"])[];
+            /** Main Agent Running */
+            main_agent_running: boolean;
             session: components["schemas"]["AgentSessionSummarySchema"];
             /** Session Id */
             session_id: string;
+            /** Updates */
+            updates: (components["schemas"]["AgentTimelineUserMessageItem"] | components["schemas"]["AgentTimelineTurnBoundaryItem"] | components["schemas"]["AgentTimelineThinkingItem"] | components["schemas"]["AgentTimelineTextItem"] | components["schemas"]["AgentTimelineToolItem"] | components["schemas"]["AgentTimelineSubagentItem"] | components["schemas"]["AgentTimelineErrorItem"])[];
         };
         /** Body_upload_container_files_route_api_sandbox_containers__id__files_upload_post */
         Body_upload_container_files_route_api_sandbox_containers__id__files_upload_post: {
@@ -1737,20 +2042,6 @@ export interface components {
              */
             message: string;
         };
-        /** CommonResponse[ListAgentEventsResponse] */
-        CommonResponse_ListAgentEventsResponse_: {
-            /**
-             * Code
-             * @default 200
-             */
-            code: number;
-            data?: components["schemas"]["ListAgentEventsResponse"] | null;
-            /**
-             * Message
-             * @default success
-             */
-            message: string;
-        };
         /** CommonResponse[ListAgentSessionsResponse] */
         CommonResponse_ListAgentSessionsResponse_: {
             /**
@@ -1759,6 +2050,20 @@ export interface components {
              */
             code: number;
             data?: components["schemas"]["ListAgentSessionsResponse"] | null;
+            /**
+             * Message
+             * @default success
+             */
+            message: string;
+        };
+        /** CommonResponse[ListAgentTimelineResponse] */
+        CommonResponse_ListAgentTimelineResponse_: {
+            /**
+             * Code
+             * @default 200
+             */
+            code: number;
+            data?: components["schemas"]["ListAgentTimelineResponse"] | null;
             /**
              * Message
              * @default success
@@ -2462,39 +2767,6 @@ export interface components {
             /** Id */
             id: number;
         };
-        /** DoneEvent */
-        DoneEvent: {
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "done";
-        };
         /** EgressProxySchema */
         EgressProxySchema: {
             /**
@@ -2524,46 +2796,6 @@ export interface components {
          * @enum {string}
          */
         EgressProxyType: "http" | "https" | "socks5";
-        /** ErrorEvent */
-        ErrorEvent: {
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /**
-             * Code
-             * @default
-             */
-            code: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Message */
-            message: string;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "error";
-        };
         /** InstanceConfigSchema */
         InstanceConfigSchema: {
             agent_pool?: components["schemas"]["AgentPoolConfig"];
@@ -2822,20 +3054,6 @@ export interface components {
              */
             llm_model: string;
         };
-        /** ListAgentEventsResponse */
-        ListAgentEventsResponse: {
-            /**
-             * Has More
-             * @default false
-             */
-            has_more: boolean;
-            /** Items */
-            items: (components["schemas"]["UserMessageEvent"] | components["schemas"]["TurnBoundaryEvent"] | components["schemas"]["TextDeltaEvent"] | components["schemas"]["TextCompleteEvent"] | components["schemas"]["ThinkingDeltaEvent"] | components["schemas"]["ThinkingCompleteEvent"] | components["schemas"]["ToolCallEvent"] | components["schemas"]["ToolResultEvent"] | components["schemas"]["SubagentTaskEvent"] | components["schemas"]["ErrorEvent"])[];
-            /** Next Before Seq */
-            next_before_seq?: number | null;
-            /** Session Id */
-            session_id: string;
-        };
         /** ListAgentSessionsResponse */
         ListAgentSessionsResponse: {
             /** Items */
@@ -2846,6 +3064,20 @@ export interface components {
             size: number;
             /** Total */
             total: number;
+        };
+        /** ListAgentTimelineResponse */
+        ListAgentTimelineResponse: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: (components["schemas"]["AgentTimelineUserMessageItem"] | components["schemas"]["AgentTimelineTurnBoundaryItem"] | components["schemas"]["AgentTimelineThinkingItem"] | components["schemas"]["AgentTimelineTextItem"] | components["schemas"]["AgentTimelineToolItem"] | components["schemas"]["AgentTimelineSubagentItem"] | components["schemas"]["AgentTimelineErrorItem"])[];
+            /** Next Before Sequence */
+            next_before_sequence?: number | null;
+            /** Session Id */
+            session_id: string;
         };
         /** ListAgentsResponse */
         ListAgentsResponse: {
@@ -3139,90 +3371,6 @@ export interface components {
             /** Message */
             message: string;
         };
-        /** ReportToolResultOutputSchema */
-        ReportToolResultOutputSchema: {
-            /** Chars */
-            chars: number;
-            /** Filename */
-            filename: string;
-            /** Report Id */
-            report_id: string;
-            /** Size */
-            size: number;
-        };
-        /** RunStateEvent */
-        RunStateEvent: {
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Running */
-            running: boolean;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "run_state";
-        };
-        /**
-         * SandboxAsyncJobStatus
-         * @enum {string}
-         */
-        SandboxAsyncJobStatus: "running" | "completed" | "failed" | "canceled";
-        /** SandboxCommandOutputChunk */
-        SandboxCommandOutputChunk: {
-            /**
-             * Content
-             * @default
-             */
-            content: string;
-            /** End Line */
-            end_line: number;
-            /** Output File */
-            output_file: string;
-            /** Start Line */
-            start_line: number;
-        };
-        /** SandboxCommandResultMetadata */
-        SandboxCommandResultMetadata: {
-            /**
-             * Error
-             * @default null
-             */
-            error: string | null;
-            /**
-             * Exit Code
-             * @default null
-             */
-            exit_code: number | null;
-            /**
-             * Output Bytes
-             * @default 0
-             */
-            output_bytes: number;
-            /**
-             * Output File
-             * @default null
-             */
-            output_file: string | null;
-            /**
-             * Output Lines
-             * @default 0
-             */
-            output_lines: number;
-            /**
-             * Run Id
-             * @default null
-             */
-            run_id: string | null;
-            status: components["schemas"]["SandboxAsyncJobStatus"];
-        };
         /**
          * SandboxContainerEgressMode
          * @enum {string}
@@ -3328,84 +3476,6 @@ export interface components {
          * @enum {string}
          */
         SessionType: "chat" | "project";
-        /** SubagentTaskEvent */
-        SubagentTaskEvent: {
-            /** Agent Code */
-            agent_code: string;
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Error Chars
-             * @default 0
-             */
-            error_chars: number;
-            /**
-             * Error Preview
-             * @default
-             */
-            error_preview: string;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /**
-             * Parent Agent Code
-             * @default
-             */
-            parent_agent_code: string;
-            /**
-             * Parent Agent Instance Id
-             * @default
-             */
-            parent_agent_instance_id: string;
-            /**
-             * Progress
-             * @default
-             */
-            progress: string;
-            /**
-             * Result Chars
-             * @default 0
-             */
-            result_chars: number;
-            /**
-             * Result Preview
-             * @default
-             */
-            result_preview: string;
-            /** Run Id */
-            run_id: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            status: components["schemas"]["AgentSubordinateStatus"];
-            /**
-             * Truncated
-             * @default false
-             */
-            truncated: boolean;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "subagent_task";
-        };
         /** SystemUserLoginRequest */
         SystemUserLoginRequest: {
             /** Email */
@@ -3455,297 +3525,6 @@ export interface components {
             status_code?: number | null;
             /** Success */
             success: boolean;
-        };
-        /** TextCompleteEvent */
-        TextCompleteEvent: {
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /** Segment Id */
-            segment_id: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /** Text */
-            text: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "text_complete";
-        };
-        /** TextDeltaEvent */
-        TextDeltaEvent: {
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Delta */
-            delta: string;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /** Segment Id */
-            segment_id: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /** Text */
-            text: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "text_delta";
-        };
-        /** ThinkingCompleteEvent */
-        ThinkingCompleteEvent: {
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /** Segment Id */
-            segment_id: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /** Text */
-            text: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "thinking_complete";
-        };
-        /** ThinkingDeltaEvent */
-        ThinkingDeltaEvent: {
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Delta */
-            delta: string;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /** Segment Id */
-            segment_id: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /** Text */
-            text: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "thinking_delta";
-        };
-        /** ToolCallEvent */
-        ToolCallEvent: {
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /** Arguments */
-            arguments?: {
-                [key: string]: unknown;
-            };
-            /** Call Id */
-            call_id: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Name */
-            name: string;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "tool_call";
-        };
-        /** ToolResultEvent */
-        ToolResultEvent: {
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /** Call Id */
-            call_id: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Is Error
-             * @default false
-             */
-            is_error: boolean;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /**
-             * Output
-             * @default
-             */
-            output: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "tool_result";
-        };
-        /** ToolResultSchema */
-        ToolResultSchema: {
-            /**
-             * Output
-             * @default
-             */
-            output: string;
-            status: components["schemas"]["ToolResultStatusSchema"];
-            type: components["schemas"]["ToolResultTypeSchema"];
-        };
-        /**
-         * ToolResultStatusSchema
-         * @enum {string}
-         */
-        ToolResultStatusSchema: "success" | "error";
-        /**
-         * ToolResultTypeSchema
-         * @enum {string}
-         */
-        ToolResultTypeSchema: "skill_detail" | "work_project" | "report";
-        /** TurnBoundaryEvent */
-        TurnBoundaryEvent: {
-            /**
-             * Agent Name
-             * @default
-             */
-            agent_name: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Nested Call Id
-             * @default
-             */
-            nested_call_id: string;
-            /**
-             * Nested For
-             * @default
-             */
-            nested_for: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "turn_boundary";
         };
         /** UpdateAgentConfigRequest */
         UpdateAgentConfigRequest: {
@@ -3866,36 +3645,6 @@ export interface components {
             rejected_files: components["schemas"]["RejectedKnowledgeDocumentUpload"][];
             /** Track Ids */
             track_ids: string[];
-        };
-        /** UserMessageEvent */
-        UserMessageEvent: {
-            /** Content */
-            content: (components["schemas"]["AgentTextInputPart"] | components["schemas"]["AgentImageInputPart"])[];
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Display Text
-             * @default
-             */
-            display_text: string;
-            /**
-             * Seq
-             * @default 0
-             */
-            seq: number;
-            /**
-             * Target Agent Code
-             * @default
-             */
-            target_agent_code: string;
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "user_message";
         };
         /**
          * WorkProjectAssertionStatus
@@ -4962,49 +4711,6 @@ export interface operations {
             };
         };
     };
-    list_agent_events_route_api_agent_sessions__session_id__events_get: {
-        parameters: {
-            query?: {
-                before_seq?: number | null;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommonResponse_ListAgentEventsResponse_"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommonResponse_Any_"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommonResponse_Any_"];
-                };
-            };
-        };
-    };
     interrupt_agent_session_route_api_agent_sessions__session_id__interrupt_post: {
         parameters: {
             query?: never;
@@ -5089,6 +4795,49 @@ export interface operations {
             };
             /** @description Agent session not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommonResponse_Any_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommonResponse_Any_"];
+                };
+            };
+        };
+    };
+    list_agent_timeline_route_api_agent_sessions__session_id__timeline_get: {
+        parameters: {
+            query?: {
+                before_sequence?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommonResponse_ListAgentTimelineResponse_"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

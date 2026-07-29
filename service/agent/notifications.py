@@ -259,6 +259,20 @@ async def has_active_session_notifications(*, session_id: str) -> bool:
         return notification_id is not None
 
 
+async def active_session_ids(session_ids: list[str]) -> set[str]:
+    if not session_ids:
+        return set()
+    async with get_async_session() as session:
+        return set((await session.exec(
+            select(AgentNotification.session_id)
+            .where(
+                AgentNotification.session_id.in_(session_ids),
+                AgentNotification.status.in_(_OUTSTANDING_VALUES),
+            )
+            .distinct()
+        )).all())
+
+
 async def has_outstanding_target_notifications(
     *,
     session_id: str,

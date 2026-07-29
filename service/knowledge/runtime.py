@@ -11,6 +11,7 @@ from service.knowledge.resources import (
     remove_knowledge_source_documents,
     remove_stale_knowledge_source_documents,
 )
+from service.knowledge.constants import MAX_KNOWLEDGE_DOCUMENT_BATCH_SIZE
 
 
 logger = get_logger(__name__)
@@ -49,10 +50,10 @@ async def start_knowledge_document_runtime() -> None:
 async def stop_knowledge_document_runtime() -> None:
     global _processing_task
     task, _processing_task = _processing_task, None
-    if task is None or task.done():
+    if task is None:
         return
-
-    task.cancel()
+    if not task.done():
+        task.cancel()
     try:
         await task
     except asyncio.CancelledError:
@@ -149,10 +150,13 @@ async def _wait_for_document_tracks(track_ids: set[str]) -> None:
     while remaining:
         async with lightrag_client() as rag:
             current_track_ids = tuple(remaining)
-            track_groups = await asyncio.gather(*(
-                rag.aget_docs_by_track_id(track_id)
-                for track_id in current_track_ids
-            ))
+            track_groups: list[dict] = []
+            for offset in range(0, len(current_track_ids), MAX_KNOWLEDGE_DOCUMENT_BATCH_SIZE):
+                batch = current_track_ids[offset:offset + MAX_KNOWLEDGE_DOCUMENT_BATCH_SIZE]
+                track_groups.extend(await asyncio.gather(*(
+                    rag.aget_docs_by_track_id(track_id)
+                    for track_id in batch
+                )))
         tracked_documents = dict(zip(current_track_ids, track_groups, strict=True))
 
         removable_file_names: list[str] = []

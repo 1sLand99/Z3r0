@@ -8,7 +8,7 @@ from handler.agent.sessions import (
     download_agent_report_handler,
     handle_agent_stream,
     interrupt_agent_session_handler,
-    list_agent_events_handler,
+    list_agent_timeline_handler,
     list_agent_sessions_handler,
     submit_agent_session_turn_handler,
     update_agent_session_sandbox_container_handler,
@@ -20,7 +20,7 @@ from schema.agent.sessions import (
     AgentSessionSummarySchema,
     AgentTurnRequest,
     AgentTurnResponse,
-    ListAgentEventsResponse,
+    ListAgentTimelineResponse,
     ListAgentSessionsResponse,
     UpdateAgentSessionSandboxContainerRequest,
     UpdateAgentSessionTitleRequest,
@@ -99,16 +99,16 @@ async def update_agent_session_sandbox_container_route(
     return await update_agent_session_sandbox_container_handler(session_id=session_id, request=request, user=user)
 
 
-async def list_agent_events_route(
+async def list_agent_timeline_route(
     session_id: str,
-    before_seq: int | None = Query(default=None, ge=1),
+    before_sequence: int | None = Query(default=None, ge=1),
     limit: int = Query(default=80, ge=1, le=200),
     user: AuthUser = Depends(require_user),
-) -> CommonResponse[ListAgentEventsResponse]:
-    return await list_agent_events_handler(
+) -> CommonResponse[ListAgentTimelineResponse]:
+    return await list_agent_timeline_handler(
         session_id=session_id,
         user=user,
-        before_seq=before_seq,
+        before_sequence=before_sequence,
         limit=limit,
     )
 
@@ -129,10 +129,10 @@ router.add_api_route(
 )
 
 router.add_api_route(
-    "/{session_id}/events",
-    list_agent_events_route,
+    "/{session_id}/timeline",
+    list_agent_timeline_route,
     methods=["GET"],
-    response_model=CommonResponse[ListAgentEventsResponse],
+    response_model=CommonResponse[ListAgentTimelineResponse],
     responses=COMMON_ERROR_RESPONSES,
 )
 

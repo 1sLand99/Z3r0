@@ -57,81 +57,6 @@
         "title": "AgentConfig",
         "type": "object"
       },
-      "AgentEventSchema": {
-        "discriminator": {
-          "mapping": {
-            "done": "#/components/schemas/DoneEvent",
-            "error": "#/components/schemas/ErrorEvent",
-            "run_state": "#/components/schemas/RunStateEvent",
-            "subagent_task": "#/components/schemas/SubagentTaskEvent",
-            "text_complete": "#/components/schemas/TextCompleteEvent",
-            "text_delta": "#/components/schemas/TextDeltaEvent",
-            "thinking_complete": "#/components/schemas/ThinkingCompleteEvent",
-            "thinking_delta": "#/components/schemas/ThinkingDeltaEvent",
-            "tool_call": "#/components/schemas/ToolCallEvent",
-            "tool_result": "#/components/schemas/ToolResultEvent",
-            "turn_boundary": "#/components/schemas/TurnBoundaryEvent",
-            "user_message": "#/components/schemas/UserMessageEvent"
-          },
-          "propertyName": "type"
-        },
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/UserMessageEvent"
-          },
-          {
-            "$ref": "#/components/schemas/TurnBoundaryEvent"
-          },
-          {
-            "$ref": "#/components/schemas/RunStateEvent"
-          },
-          {
-            "$ref": "#/components/schemas/TextDeltaEvent"
-          },
-          {
-            "$ref": "#/components/schemas/TextCompleteEvent"
-          },
-          {
-            "$ref": "#/components/schemas/ThinkingDeltaEvent"
-          },
-          {
-            "$ref": "#/components/schemas/ThinkingCompleteEvent"
-          },
-          {
-            "$ref": "#/components/schemas/ToolCallEvent"
-          },
-          {
-            "$ref": "#/components/schemas/ToolResultEvent"
-          },
-          {
-            "$ref": "#/components/schemas/SubagentTaskEvent"
-          },
-          {
-            "$ref": "#/components/schemas/DoneEvent"
-          },
-          {
-            "$ref": "#/components/schemas/ErrorEvent"
-          }
-        ]
-      },
-      "AgentEventTypeSchema": {
-        "enum": [
-          "user_message",
-          "turn_boundary",
-          "run_state",
-          "thinking_delta",
-          "thinking_complete",
-          "text_delta",
-          "text_complete",
-          "tool_call",
-          "tool_result",
-          "subagent_task",
-          "done",
-          "error"
-        ],
-        "title": "AgentEventTypeSchema",
-        "type": "string"
-      },
       "AgentImageDetailSchema": {
         "enum": [
           "auto",
@@ -450,6 +375,217 @@
         "title": "AgentSessionSummarySchema",
         "type": "object"
       },
+      "AgentStreamFrameSchema": {
+        "discriminator": {
+          "mapping": {
+            "item_upsert": "#/components/schemas/AgentStreamItemUpsertFrame",
+            "run_state": "#/components/schemas/AgentStreamRunStateFrame",
+            "snapshot": "#/components/schemas/AgentStreamSnapshotFrame",
+            "text_append": "#/components/schemas/AgentStreamTextAppendFrame"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AgentStreamSnapshotFrame"
+          },
+          {
+            "$ref": "#/components/schemas/AgentStreamItemUpsertFrame"
+          },
+          {
+            "$ref": "#/components/schemas/AgentStreamTextAppendFrame"
+          },
+          {
+            "$ref": "#/components/schemas/AgentStreamRunStateFrame"
+          }
+        ]
+      },
+      "AgentStreamFrameTypeSchema": {
+        "enum": [
+          "snapshot",
+          "item_upsert",
+          "text_append",
+          "run_state"
+        ],
+        "title": "AgentStreamFrameTypeSchema",
+        "type": "string"
+      },
+      "AgentStreamItemUpsertFrame": {
+        "properties": {
+          "item": {
+            "discriminator": {
+              "mapping": {
+                "error": "#/components/schemas/AgentTimelineErrorItem",
+                "subagent": "#/components/schemas/AgentTimelineSubagentItem",
+                "text": "#/components/schemas/AgentTimelineTextItem",
+                "thinking": "#/components/schemas/AgentTimelineThinkingItem",
+                "tool": "#/components/schemas/AgentTimelineToolItem",
+                "turn_boundary": "#/components/schemas/AgentTimelineTurnBoundaryItem",
+                "user_message": "#/components/schemas/AgentTimelineUserMessageItem"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AgentTimelineUserMessageItem"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTimelineTurnBoundaryItem"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTimelineThinkingItem"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTimelineTextItem"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTimelineToolItem"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTimelineSubagentItem"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTimelineErrorItem"
+              }
+            ],
+            "title": "Item"
+          },
+          "type": {
+            "const": "item_upsert",
+            "default": "item_upsert",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "title": "AgentStreamItemUpsertFrame",
+        "type": "object"
+      },
+      "AgentStreamRunStateFrame": {
+        "properties": {
+          "main_agent_running": {
+            "title": "Main Agent Running",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "run_state",
+            "default": "run_state",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "main_agent_running"
+        ],
+        "title": "AgentStreamRunStateFrame",
+        "type": "object"
+      },
+      "AgentStreamSnapshotFrame": {
+        "properties": {
+          "items": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "error": "#/components/schemas/AgentTimelineErrorItem",
+                  "subagent": "#/components/schemas/AgentTimelineSubagentItem",
+                  "text": "#/components/schemas/AgentTimelineTextItem",
+                  "thinking": "#/components/schemas/AgentTimelineThinkingItem",
+                  "tool": "#/components/schemas/AgentTimelineToolItem",
+                  "turn_boundary": "#/components/schemas/AgentTimelineTurnBoundaryItem",
+                  "user_message": "#/components/schemas/AgentTimelineUserMessageItem"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AgentTimelineUserMessageItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineTurnBoundaryItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineThinkingItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineTextItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineToolItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineSubagentItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineErrorItem"
+                }
+              ]
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "latest_sequence": {
+            "minimum": 0,
+            "title": "Latest Sequence",
+            "type": "integer"
+          },
+          "main_agent_running": {
+            "title": "Main Agent Running",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "snapshot",
+            "default": "snapshot",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "main_agent_running",
+          "latest_sequence",
+          "items"
+        ],
+        "title": "AgentStreamSnapshotFrame",
+        "type": "object"
+      },
+      "AgentStreamTextAppendFrame": {
+        "properties": {
+          "delta": {
+            "title": "Delta",
+            "type": "string"
+          },
+          "item_id": {
+            "minLength": 1,
+            "title": "Item Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "sequence": {
+            "minimum": 1,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "type": {
+            "const": "text_append",
+            "default": "text_append",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "sequence",
+          "revision",
+          "delta"
+        ],
+        "title": "AgentStreamTextAppendFrame",
+        "type": "object"
+      },
       "AgentSubordinateStatus": {
         "enum": [
           "running",
@@ -459,111 +595,6 @@
         ],
         "title": "AgentSubordinateStatus",
         "type": "string"
-      },
-      "AgentSubordinateTaskToolItem": {
-        "properties": {
-          "agent_code": {
-            "title": "Agent Code",
-            "type": "string"
-          },
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "error": {
-            "default": "",
-            "title": "Error",
-            "type": "string"
-          },
-          "error_chars": {
-            "default": 0,
-            "title": "Error Chars",
-            "type": "integer"
-          },
-          "next_offset": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Next Offset"
-          },
-          "progress": {
-            "default": "",
-            "title": "Progress",
-            "type": "string"
-          },
-          "result": {
-            "default": "",
-            "title": "Result",
-            "type": "string"
-          },
-          "result_chars": {
-            "default": 0,
-            "title": "Result Chars",
-            "type": "integer"
-          },
-          "run_id": {
-            "title": "Run Id",
-            "type": "string"
-          },
-          "status": {
-            "$ref": "#/components/schemas/AgentSubordinateStatus"
-          },
-          "work_item_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Work Item Id"
-          }
-        },
-        "required": [
-          "run_id",
-          "agent_code",
-          "status"
-        ],
-        "title": "AgentSubordinateTaskToolItem",
-        "type": "object"
-      },
-      "AgentSubordinateTaskToolResult": {
-        "properties": {
-          "message": {
-            "default": "",
-            "title": "Message",
-            "type": "string"
-          },
-          "task": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AgentSubordinateTaskToolItem"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "tasks": {
-            "items": {
-              "$ref": "#/components/schemas/AgentSubordinateTaskToolItem"
-            },
-            "title": "Tasks",
-            "type": "array"
-          }
-        },
-        "title": "AgentSubordinateTaskToolResult",
-        "type": "object"
       },
       "AgentTextInputPart": {
         "properties": {
@@ -584,6 +615,613 @@
           "text"
         ],
         "title": "AgentTextInputPart",
+        "type": "object"
+      },
+      "AgentTimelineAttachmentTypeSchema": {
+        "enum": [
+          "report"
+        ],
+        "title": "AgentTimelineAttachmentTypeSchema",
+        "type": "string"
+      },
+      "AgentTimelineContentStateSchema": {
+        "enum": [
+          "streaming",
+          "completed"
+        ],
+        "title": "AgentTimelineContentStateSchema",
+        "type": "string"
+      },
+      "AgentTimelineErrorItem": {
+        "properties": {
+          "agent_name": {
+            "default": "",
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "item_id": {
+            "minLength": 1,
+            "title": "Item Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "sequence": {
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "type": {
+            "const": "error",
+            "default": "error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "sequence",
+          "revision",
+          "created_at",
+          "message"
+        ],
+        "title": "AgentTimelineErrorItem",
+        "type": "object"
+      },
+      "AgentTimelineItemTypeSchema": {
+        "enum": [
+          "user_message",
+          "turn_boundary",
+          "thinking",
+          "text",
+          "tool",
+          "subagent",
+          "error"
+        ],
+        "title": "AgentTimelineItemTypeSchema",
+        "type": "string"
+      },
+      "AgentTimelineReportAttachment": {
+        "properties": {
+          "chars": {
+            "minimum": 0.0,
+            "title": "Chars",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "report_id": {
+            "title": "Report Id",
+            "type": "string"
+          },
+          "size": {
+            "minimum": 0.0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "type": {
+            "const": "report",
+            "default": "report",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "report_id",
+          "filename",
+          "size",
+          "chars"
+        ],
+        "title": "AgentTimelineReportAttachment",
+        "type": "object"
+      },
+      "AgentTimelineSubagentItem": {
+        "properties": {
+          "agent_code": {
+            "title": "Agent Code",
+            "type": "string"
+          },
+          "agent_name": {
+            "default": "",
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_chars": {
+            "default": 0,
+            "title": "Error Chars",
+            "type": "integer"
+          },
+          "error_preview": {
+            "default": "",
+            "title": "Error Preview",
+            "type": "string"
+          },
+          "item_id": {
+            "minLength": 1,
+            "title": "Item Id",
+            "type": "string"
+          },
+          "parent_agent_code": {
+            "default": "",
+            "title": "Parent Agent Code",
+            "type": "string"
+          },
+          "parent_agent_instance_id": {
+            "default": "",
+            "title": "Parent Agent Instance Id",
+            "type": "string"
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id"
+          },
+          "progress": {
+            "default": "",
+            "title": "Progress",
+            "type": "string"
+          },
+          "result_chars": {
+            "default": 0,
+            "title": "Result Chars",
+            "type": "integer"
+          },
+          "result_preview": {
+            "default": "",
+            "title": "Result Preview",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "sequence": {
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentSubordinateStatus"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "subagent",
+            "default": "subagent",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "sequence",
+          "revision",
+          "created_at",
+          "run_id",
+          "agent_code",
+          "status"
+        ],
+        "title": "AgentTimelineSubagentItem",
+        "type": "object"
+      },
+      "AgentTimelineTextItem": {
+        "properties": {
+          "agent_name": {
+            "default": "",
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "item_id": {
+            "minLength": 1,
+            "title": "Item Id",
+            "type": "string"
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "sequence": {
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentTimelineContentStateSchema",
+            "default": "streaming"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "text",
+            "default": "text",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "sequence",
+          "revision",
+          "created_at"
+        ],
+        "title": "AgentTimelineTextItem",
+        "type": "object"
+      },
+      "AgentTimelineThinkingItem": {
+        "properties": {
+          "agent_name": {
+            "default": "",
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "item_id": {
+            "minLength": 1,
+            "title": "Item Id",
+            "type": "string"
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "sequence": {
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentTimelineContentStateSchema",
+            "default": "streaming"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "thinking",
+            "default": "thinking",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "sequence",
+          "revision",
+          "created_at"
+        ],
+        "title": "AgentTimelineThinkingItem",
+        "type": "object"
+      },
+      "AgentTimelineToolItem": {
+        "properties": {
+          "agent_name": {
+            "default": "",
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "attachments": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "report": "#/components/schemas/AgentTimelineReportAttachment"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AgentTimelineReportAttachment"
+                }
+              ]
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "call_id": {
+            "title": "Call Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "item_id": {
+            "minLength": 1,
+            "title": "Item Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "output": {
+            "default": "",
+            "title": "Output",
+            "type": "string"
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "sequence": {
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgentTimelineToolStateSchema",
+            "default": "pending"
+          },
+          "type": {
+            "const": "tool",
+            "default": "tool",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "sequence",
+          "revision",
+          "created_at",
+          "call_id",
+          "name"
+        ],
+        "title": "AgentTimelineToolItem",
+        "type": "object"
+      },
+      "AgentTimelineToolStateSchema": {
+        "enum": [
+          "pending",
+          "completed",
+          "failed"
+        ],
+        "title": "AgentTimelineToolStateSchema",
+        "type": "string"
+      },
+      "AgentTimelineTurnBoundaryItem": {
+        "properties": {
+          "agent_name": {
+            "default": "",
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "item_id": {
+            "minLength": 1,
+            "title": "Item Id",
+            "type": "string"
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "sequence": {
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "type": {
+            "const": "turn_boundary",
+            "default": "turn_boundary",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "sequence",
+          "revision",
+          "created_at"
+        ],
+        "title": "AgentTimelineTurnBoundaryItem",
+        "type": "object"
+      },
+      "AgentTimelineUserMessageItem": {
+        "properties": {
+          "agent_name": {
+            "default": "",
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "content": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "image": "#/components/schemas/AgentImageInputPart",
+                  "text": "#/components/schemas/AgentTextInputPart"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AgentTextInputPart"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentImageInputPart"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Content",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_text": {
+            "default": "",
+            "title": "Display Text",
+            "type": "string"
+          },
+          "item_id": {
+            "minLength": 1,
+            "title": "Item Id",
+            "type": "string"
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "sequence": {
+            "minimum": 1.0,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "target_agent_code": {
+            "default": "",
+            "title": "Target Agent Code",
+            "type": "string"
+          },
+          "type": {
+            "const": "user_message",
+            "default": "user_message",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "sequence",
+          "revision",
+          "created_at",
+          "content"
+        ],
+        "title": "AgentTimelineUserMessageItem",
         "type": "object"
       },
       "AgentTurnRequest": {
@@ -647,66 +1285,9 @@
       },
       "AgentTurnResponse": {
         "properties": {
-          "events": {
-            "items": {
-              "discriminator": {
-                "mapping": {
-                  "done": "#/components/schemas/DoneEvent",
-                  "error": "#/components/schemas/ErrorEvent",
-                  "run_state": "#/components/schemas/RunStateEvent",
-                  "subagent_task": "#/components/schemas/SubagentTaskEvent",
-                  "text_complete": "#/components/schemas/TextCompleteEvent",
-                  "text_delta": "#/components/schemas/TextDeltaEvent",
-                  "thinking_complete": "#/components/schemas/ThinkingCompleteEvent",
-                  "thinking_delta": "#/components/schemas/ThinkingDeltaEvent",
-                  "tool_call": "#/components/schemas/ToolCallEvent",
-                  "tool_result": "#/components/schemas/ToolResultEvent",
-                  "turn_boundary": "#/components/schemas/TurnBoundaryEvent",
-                  "user_message": "#/components/schemas/UserMessageEvent"
-                },
-                "propertyName": "type"
-              },
-              "oneOf": [
-                {
-                  "$ref": "#/components/schemas/UserMessageEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/TurnBoundaryEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/RunStateEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/TextDeltaEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/TextCompleteEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ThinkingDeltaEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ThinkingCompleteEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ToolCallEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ToolResultEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/SubagentTaskEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/DoneEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ErrorEvent"
-                }
-              ]
-            },
-            "title": "Events",
-            "type": "array"
+          "main_agent_running": {
+            "title": "Main Agent Running",
+            "type": "boolean"
           },
           "session": {
             "$ref": "#/components/schemas/AgentSessionSummarySchema"
@@ -714,12 +1295,54 @@
           "session_id": {
             "title": "Session Id",
             "type": "string"
+          },
+          "updates": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "error": "#/components/schemas/AgentTimelineErrorItem",
+                  "subagent": "#/components/schemas/AgentTimelineSubagentItem",
+                  "text": "#/components/schemas/AgentTimelineTextItem",
+                  "thinking": "#/components/schemas/AgentTimelineThinkingItem",
+                  "tool": "#/components/schemas/AgentTimelineToolItem",
+                  "turn_boundary": "#/components/schemas/AgentTimelineTurnBoundaryItem",
+                  "user_message": "#/components/schemas/AgentTimelineUserMessageItem"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AgentTimelineUserMessageItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineTurnBoundaryItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineThinkingItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineTextItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineToolItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineSubagentItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineErrorItem"
+                }
+              ]
+            },
+            "title": "Updates",
+            "type": "array"
           }
         },
         "required": [
           "session_id",
           "session",
-          "events"
+          "main_agent_running",
+          "updates"
         ],
         "title": "AgentTurnResponse",
         "type": "object"
@@ -1254,32 +1877,6 @@
         "title": "CommonResponse[KnowledgeVectorDetailSchema]",
         "type": "object"
       },
-      "CommonResponse_ListAgentEventsResponse_": {
-        "properties": {
-          "code": {
-            "default": 200,
-            "title": "Code",
-            "type": "integer"
-          },
-          "data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ListAgentEventsResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "message": {
-            "default": "success",
-            "title": "Message",
-            "type": "string"
-          }
-        },
-        "title": "CommonResponse[ListAgentEventsResponse]",
-        "type": "object"
-      },
       "CommonResponse_ListAgentSessionsResponse_": {
         "properties": {
           "code": {
@@ -1304,6 +1901,32 @@
           }
         },
         "title": "CommonResponse[ListAgentSessionsResponse]",
+        "type": "object"
+      },
+      "CommonResponse_ListAgentTimelineResponse_": {
+        "properties": {
+          "code": {
+            "default": 200,
+            "title": "Code",
+            "type": "integer"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListAgentTimelineResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "success",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "title": "CommonResponse[ListAgentTimelineResponse]",
         "type": "object"
       },
       "CommonResponse_ListAgentsResponse_": {
@@ -2763,46 +3386,6 @@
         "title": "DeleteWorkProjectResponse",
         "type": "object"
       },
-      "DoneEvent": {
-        "properties": {
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "type": {
-            "const": "done",
-            "default": "done",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at"
-        ],
-        "title": "DoneEvent",
-        "type": "object"
-      },
       "EgressProxySchema": {
         "properties": {
           "created_at": {
@@ -2860,56 +3443,6 @@
         ],
         "title": "EgressProxyType",
         "type": "string"
-      },
-      "ErrorEvent": {
-        "properties": {
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "code": {
-            "default": "",
-            "title": "Code",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "type": {
-            "const": "error",
-            "default": "error",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "message"
-        ],
-        "title": "ErrorEvent",
-        "type": "object"
       },
       "InstanceConfigSchema": {
         "additionalProperties": false,
@@ -3496,89 +4029,6 @@
         "title": "LightRAGConfig",
         "type": "object"
       },
-      "ListAgentEventsResponse": {
-        "properties": {
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "items": {
-            "items": {
-              "discriminator": {
-                "mapping": {
-                  "error": "#/components/schemas/ErrorEvent",
-                  "subagent_task": "#/components/schemas/SubagentTaskEvent",
-                  "text_complete": "#/components/schemas/TextCompleteEvent",
-                  "text_delta": "#/components/schemas/TextDeltaEvent",
-                  "thinking_complete": "#/components/schemas/ThinkingCompleteEvent",
-                  "thinking_delta": "#/components/schemas/ThinkingDeltaEvent",
-                  "tool_call": "#/components/schemas/ToolCallEvent",
-                  "tool_result": "#/components/schemas/ToolResultEvent",
-                  "turn_boundary": "#/components/schemas/TurnBoundaryEvent",
-                  "user_message": "#/components/schemas/UserMessageEvent"
-                },
-                "propertyName": "type"
-              },
-              "oneOf": [
-                {
-                  "$ref": "#/components/schemas/UserMessageEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/TurnBoundaryEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/TextDeltaEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/TextCompleteEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ThinkingDeltaEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ThinkingCompleteEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ToolCallEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ToolResultEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/SubagentTaskEvent"
-                },
-                {
-                  "$ref": "#/components/schemas/ErrorEvent"
-                }
-              ]
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "next_before_seq": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Before Seq"
-          },
-          "session_id": {
-            "title": "Session Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "session_id",
-          "items"
-        ],
-        "title": "ListAgentEventsResponse",
-        "type": "object"
-      },
       "ListAgentSessionsResponse": {
         "properties": {
           "items": {
@@ -3608,6 +4058,77 @@
           "items"
         ],
         "title": "ListAgentSessionsResponse",
+        "type": "object"
+      },
+      "ListAgentTimelineResponse": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "error": "#/components/schemas/AgentTimelineErrorItem",
+                  "subagent": "#/components/schemas/AgentTimelineSubagentItem",
+                  "text": "#/components/schemas/AgentTimelineTextItem",
+                  "thinking": "#/components/schemas/AgentTimelineThinkingItem",
+                  "tool": "#/components/schemas/AgentTimelineToolItem",
+                  "turn_boundary": "#/components/schemas/AgentTimelineTurnBoundaryItem",
+                  "user_message": "#/components/schemas/AgentTimelineUserMessageItem"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AgentTimelineUserMessageItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineTurnBoundaryItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineThinkingItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineTextItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineToolItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineSubagentItem"
+                },
+                {
+                  "$ref": "#/components/schemas/AgentTimelineErrorItem"
+                }
+              ]
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_before_sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Sequence"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "items"
+        ],
+        "title": "ListAgentTimelineResponse",
         "type": "object"
       },
       "ListAgentsResponse": {
@@ -4385,179 +4906,6 @@
         "title": "RejectedKnowledgeDocumentUpload",
         "type": "object"
       },
-      "ReportToolResultOutputSchema": {
-        "properties": {
-          "chars": {
-            "minimum": 0,
-            "title": "Chars",
-            "type": "integer"
-          },
-          "filename": {
-            "title": "Filename",
-            "type": "string"
-          },
-          "report_id": {
-            "minLength": 1,
-            "title": "Report Id",
-            "type": "string"
-          },
-          "size": {
-            "minimum": 0,
-            "title": "Size",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "report_id",
-          "filename",
-          "size",
-          "chars"
-        ],
-        "title": "ReportToolResultOutputSchema",
-        "type": "object"
-      },
-      "RunStateEvent": {
-        "properties": {
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "running": {
-            "title": "Running",
-            "type": "boolean"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "type": {
-            "const": "run_state",
-            "default": "run_state",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "running"
-        ],
-        "title": "RunStateEvent",
-        "type": "object"
-      },
-      "SandboxAsyncJobStatus": {
-        "enum": [
-          "running",
-          "completed",
-          "failed",
-          "canceled"
-        ],
-        "title": "SandboxAsyncJobStatus",
-        "type": "string"
-      },
-      "SandboxCommandOutputChunk": {
-        "properties": {
-          "content": {
-            "default": "",
-            "title": "Content",
-            "type": "string"
-          },
-          "end_line": {
-            "minimum": 1,
-            "title": "End Line",
-            "type": "integer"
-          },
-          "output_file": {
-            "title": "Output File",
-            "type": "string"
-          },
-          "start_line": {
-            "minimum": 1,
-            "title": "Start Line",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "output_file",
-          "start_line",
-          "end_line"
-        ],
-        "title": "SandboxCommandOutputChunk",
-        "type": "object"
-      },
-      "SandboxCommandResultMetadata": {
-        "properties": {
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Error"
-          },
-          "exit_code": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Exit Code"
-          },
-          "output_bytes": {
-            "default": 0,
-            "minimum": 0,
-            "title": "Output Bytes",
-            "type": "integer"
-          },
-          "output_file": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Output File"
-          },
-          "output_lines": {
-            "default": 0,
-            "minimum": 0,
-            "title": "Output Lines",
-            "type": "integer"
-          },
-          "run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Run Id"
-          },
-          "status": {
-            "$ref": "#/components/schemas/SandboxAsyncJobStatus"
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "title": "SandboxCommandResultMetadata",
-        "type": "object"
-      },
       "SandboxContainerEgressMode": {
         "enum": [
           "direct",
@@ -4798,100 +5146,6 @@
         "title": "SessionType",
         "type": "string"
       },
-      "SubagentTaskEvent": {
-        "properties": {
-          "agent_code": {
-            "title": "Agent Code",
-            "type": "string"
-          },
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "error_chars": {
-            "default": 0,
-            "title": "Error Chars",
-            "type": "integer"
-          },
-          "error_preview": {
-            "default": "",
-            "title": "Error Preview",
-            "type": "string"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "parent_agent_code": {
-            "default": "",
-            "title": "Parent Agent Code",
-            "type": "string"
-          },
-          "parent_agent_instance_id": {
-            "default": "",
-            "title": "Parent Agent Instance Id",
-            "type": "string"
-          },
-          "progress": {
-            "default": "",
-            "title": "Progress",
-            "type": "string"
-          },
-          "result_chars": {
-            "default": 0,
-            "title": "Result Chars",
-            "type": "integer"
-          },
-          "result_preview": {
-            "default": "",
-            "title": "Result Preview",
-            "type": "string"
-          },
-          "run_id": {
-            "title": "Run Id",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "status": {
-            "$ref": "#/components/schemas/AgentSubordinateStatus"
-          },
-          "truncated": {
-            "default": false,
-            "title": "Truncated",
-            "type": "boolean"
-          },
-          "type": {
-            "const": "subagent_task",
-            "default": "subagent_task",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "run_id",
-          "agent_code",
-          "status"
-        ],
-        "title": "SubagentTaskEvent",
-        "type": "object"
-      },
       "SystemUserLoginRequest": {
         "properties": {
           "email": {
@@ -5011,404 +5265,6 @@
           "message"
         ],
         "title": "TestEgressProxyResponse",
-        "type": "object"
-      },
-      "TextCompleteEvent": {
-        "properties": {
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "segment_id": {
-            "title": "Segment Id",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "type": {
-            "const": "text_complete",
-            "default": "text_complete",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "segment_id",
-          "text"
-        ],
-        "title": "TextCompleteEvent",
-        "type": "object"
-      },
-      "TextDeltaEvent": {
-        "properties": {
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "delta": {
-            "title": "Delta",
-            "type": "string"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "segment_id": {
-            "title": "Segment Id",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "type": {
-            "const": "text_delta",
-            "default": "text_delta",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "segment_id",
-          "delta",
-          "text"
-        ],
-        "title": "TextDeltaEvent",
-        "type": "object"
-      },
-      "ThinkingCompleteEvent": {
-        "properties": {
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "segment_id": {
-            "title": "Segment Id",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "type": {
-            "const": "thinking_complete",
-            "default": "thinking_complete",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "segment_id",
-          "text"
-        ],
-        "title": "ThinkingCompleteEvent",
-        "type": "object"
-      },
-      "ThinkingDeltaEvent": {
-        "properties": {
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "delta": {
-            "title": "Delta",
-            "type": "string"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "segment_id": {
-            "title": "Segment Id",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "type": {
-            "const": "thinking_delta",
-            "default": "thinking_delta",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "segment_id",
-          "delta",
-          "text"
-        ],
-        "title": "ThinkingDeltaEvent",
-        "type": "object"
-      },
-      "ToolCallEvent": {
-        "properties": {
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "arguments": {
-            "additionalProperties": true,
-            "title": "Arguments",
-            "type": "object"
-          },
-          "call_id": {
-            "title": "Call Id",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "type": {
-            "const": "tool_call",
-            "default": "tool_call",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "call_id",
-          "name"
-        ],
-        "title": "ToolCallEvent",
-        "type": "object"
-      },
-      "ToolResultEvent": {
-        "properties": {
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "call_id": {
-            "title": "Call Id",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "is_error": {
-            "default": false,
-            "title": "Is Error",
-            "type": "boolean"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "output": {
-            "default": "",
-            "title": "Output",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "type": {
-            "const": "tool_result",
-            "default": "tool_result",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "call_id"
-        ],
-        "title": "ToolResultEvent",
-        "type": "object"
-      },
-      "ToolResultSchema": {
-        "properties": {
-          "output": {
-            "default": "",
-            "title": "Output",
-            "type": "string"
-          },
-          "status": {
-            "$ref": "#/components/schemas/ToolResultStatusSchema"
-          },
-          "type": {
-            "$ref": "#/components/schemas/ToolResultTypeSchema"
-          }
-        },
-        "required": [
-          "status",
-          "type"
-        ],
-        "title": "ToolResultSchema",
-        "type": "object"
-      },
-      "ToolResultStatusSchema": {
-        "enum": [
-          "success",
-          "error"
-        ],
-        "title": "ToolResultStatusSchema",
-        "type": "string"
-      },
-      "ToolResultTypeSchema": {
-        "enum": [
-          "skill_detail",
-          "work_project",
-          "report"
-        ],
-        "title": "ToolResultTypeSchema",
-        "type": "string"
-      },
-      "TurnBoundaryEvent": {
-        "properties": {
-          "agent_name": {
-            "default": "",
-            "title": "Agent Name",
-            "type": "string"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "nested_call_id": {
-            "default": "",
-            "title": "Nested Call Id",
-            "type": "string"
-          },
-          "nested_for": {
-            "default": "",
-            "title": "Nested For",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "type": {
-            "const": "turn_boundary",
-            "default": "turn_boundary",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at"
-        ],
-        "title": "TurnBoundaryEvent",
         "type": "object"
       },
       "UpdateAgentConfigRequest": {
@@ -5883,64 +5739,6 @@
           "rejected_files"
         ],
         "title": "UploadKnowledgeDocumentsResponse",
-        "type": "object"
-      },
-      "UserMessageEvent": {
-        "properties": {
-          "content": {
-            "items": {
-              "discriminator": {
-                "mapping": {
-                  "image": "#/components/schemas/AgentImageInputPart",
-                  "text": "#/components/schemas/AgentTextInputPart"
-                },
-                "propertyName": "type"
-              },
-              "oneOf": [
-                {
-                  "$ref": "#/components/schemas/AgentTextInputPart"
-                },
-                {
-                  "$ref": "#/components/schemas/AgentImageInputPart"
-                }
-              ]
-            },
-            "minItems": 1,
-            "title": "Content",
-            "type": "array"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "display_text": {
-            "default": "",
-            "title": "Display Text",
-            "type": "string"
-          },
-          "seq": {
-            "default": 0,
-            "title": "Seq",
-            "type": "integer"
-          },
-          "target_agent_code": {
-            "default": "",
-            "title": "Target Agent Code",
-            "type": "string"
-          },
-          "type": {
-            "const": "user_message",
-            "default": "user_message",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "created_at",
-          "content"
-        ],
-        "title": "UserMessageEvent",
         "type": "object"
       },
       "WorkProjectAssertionStatus": {
@@ -8070,92 +7868,6 @@
         ]
       }
     },
-    "/api/agent-sessions/{session_id}/events": {
-      "get": {
-        "operationId": "list_agent_events_route_api_agent_sessions__session_id__events_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "session_id",
-            "required": true,
-            "schema": {
-              "title": "Session Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "before_seq",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "minimum": 1,
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Before Seq"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 80,
-              "maximum": 200,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommonResponse_ListAgentEventsResponse_"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommonResponse_Any_"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommonResponse_Any_"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "AccessTokenAuth": []
-          }
-        ],
-        "summary": "List Agent Events Route",
-        "tags": [
-          "agent-sessions"
-        ]
-      }
-    },
     "/api/agent-sessions/{session_id}/interrupt": {
       "post": {
         "operationId": "interrupt_agent_session_route_api_agent_sessions__session_id__interrupt_post",
@@ -8295,6 +8007,92 @@
           }
         ],
         "summary": "Update Agent Session Sandbox Container Route",
+        "tags": [
+          "agent-sessions"
+        ]
+      }
+    },
+    "/api/agent-sessions/{session_id}/timeline": {
+      "get": {
+        "operationId": "list_agent_timeline_route_api_agent_sessions__session_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before_sequence",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Sequence"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 80,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommonResponse_ListAgentTimelineResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommonResponse_Any_"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommonResponse_Any_"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "AccessTokenAuth": []
+          }
+        ],
+        "summary": "List Agent Timeline Route",
         "tags": [
           "agent-sessions"
         ]

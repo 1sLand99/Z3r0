@@ -3,7 +3,7 @@ from collections.abc import Awaitable, Callable
 from schema.agent.events import AgentEventSchema
 
 
-_EventPublisher = Callable[[str, AgentEventSchema], bool]
+_EventPublisher = Callable[[str, AgentEventSchema], Awaitable[None]]
 _MainAgentResumeHandler = Callable[[str], Awaitable[None]]
 _TargetAgentResumeHandler = Callable[[str, str], Awaitable[None]]
 _SubagentCancelHandler = Callable[[int], Awaitable[bool]]
@@ -21,8 +21,10 @@ def set_agent_event_publisher(publisher: _EventPublisher) -> None:
     _event_publisher = publisher
 
 
-def publish_agent_event(session_id: str, event: AgentEventSchema) -> bool:
-    return _event_publisher(session_id, event) if _event_publisher is not None else False
+async def publish_agent_event(session_id: str, event: AgentEventSchema) -> None:
+    if _event_publisher is None:
+        raise RuntimeError("agent event publisher is not configured")
+    await _event_publisher(session_id, event)
 
 
 def set_main_agent_resume_handler(handler: _MainAgentResumeHandler) -> None:

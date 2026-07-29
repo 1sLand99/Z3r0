@@ -9,7 +9,7 @@ from core.tools.sandbox import SANDBOX_SKILLS_DIR
 from logger import get_logger
 from middleware.system_user import AuthUser
 from model.agent.sessions import AgentSessionMeta
-from schema.agent.events import AgentEventSchema, AgentInputPart
+from schema.agent.events import AgentInputPart, AgentStreamFrameSchema
 from schema.agent.sessions import AgentSessionSummarySchema
 from service.agent import sessions as agent_sessions
 from service.agent import notifications as agent_notifications
@@ -58,7 +58,7 @@ async def submit_user_turn(
     user: AuthUser,
     sandbox_container_id: int | None,
     requested_agent_code: str | None,
-) -> list[AgentEventSchema]:
+) -> list[AgentStreamFrameSchema]:
     await apply_turn_sandbox_selection(
         session_id=session_id,
         sandbox_container_id=sandbox_container_id,
@@ -78,7 +78,7 @@ async def submit_turn(
     content: list[AgentInputPart],
     user: AuthUser,
     requested_agent_code: str | None,
-) -> list[AgentEventSchema]:
+) -> list[AgentStreamFrameSchema]:
     meta = await agent_sessions.get_accessible_session_meta(session_id, user.id, user.role)
     if meta is None:
         raise PermissionError("agent session not found")
@@ -116,7 +116,7 @@ async def submit_new_chat_turn(
     user: AuthUser,
     sandbox_container_id: int | None,
     requested_agent_code: str | None,
-) -> tuple[str, list[AgentEventSchema]]:
+) -> tuple[str, list[AgentStreamFrameSchema]]:
     session_id = await agent_sessions.create_session(user_id=user.id)
     try:
         events = await submit_user_turn(
@@ -211,12 +211,12 @@ async def update_selected_sandbox_container(
     return session
 
 
-async def interrupt_turn(*, session_id: str, user: AuthUser) -> list[AgentEventSchema]:
+async def interrupt_turn(*, session_id: str, user: AuthUser) -> list[AgentStreamFrameSchema]:
     await _raise_unless_can_access(session_id, user)
     return await get_agent_pool().try_interrupt(session_id)
 
 
-async def cancel_all_tasks(*, session_id: str, user: AuthUser) -> list[AgentEventSchema]:
+async def cancel_all_tasks(*, session_id: str, user: AuthUser) -> list[AgentStreamFrameSchema]:
     await _raise_unless_can_access(session_id, user)
     return await get_agent_pool().cancel_all(session_id)
 

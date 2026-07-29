@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 REPORT_ROOT = Path("/tmp/reports")
 REPORT_EXTENSION = ".md"
 _REPORT_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
-_REPORT_FILE_ID_PATTERN = re.compile(r"^[0-9a-z]{1,16}-[a-f0-9]{4}$")
+_REPORT_FILE_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 _REPORT_ID_SEPARATOR = ":"
 _REPORT_CLEANUP_INTERVAL_SECONDS = 60 * 60
 
@@ -28,26 +28,30 @@ async def export_session_report(session_id: str, content: str) -> ReportToolResu
     session_dir = _safe_session_report_dir(session_id)
 
     async with _report_export_lock:
-        session_dir.mkdir(parents=True, exist_ok=True)
-        report_path = _new_report_path(session_dir)
-
-        _write_text_atomic(report_path, report_content)
-        stat = report_path.stat()
+        report_path, size = await asyncio.to_thread(
+            _write_report_sync,
+            session_dir,
+            report_content,
+        )
 
     return ReportToolResultOutputSchema(
         report_id=report_id_for_path(report_path),
         filename=report_download_filename(report_path),
-        size=stat.st_size,
+        size=size,
         chars=len(report_content),
     )
 
 
-def resolve_report_download_path(report_id: str) -> Path:
+async def resolve_report_download(report_id: str) -> tuple[Path, str, str]:
+    return await asyncio.to_thread(_resolve_report_download_sync, report_id)
+
+
+def _resolve_report_download_sync(report_id: str) -> tuple[Path, str, str]:
     session_id, file_id = _parse_report_id(report_id)
     resolved_path = (_safe_session_report_dir(session_id) / f"{file_id}{REPORT_EXTENSION}").resolve()
     if not _is_report_file_path(resolved_path):
         raise FileNotFoundError("report file not found")
-    return resolved_path
+    return resolved_path, session_id, report_download_filename(resolved_path)
 
 
 def report_id_for_path(report_path: Path) -> str:
@@ -93,7 +97,7 @@ def report_download_filename(report_path: Path) -> str:
 async def cleanup_expired_reports() -> int:
     retention_seconds = get_config().agent_runtime.report_retention_seconds
     threshold = time() - retention_seconds
-    deleted = _cleanup_expired_reports_sync(threshold)
+    deleted = await asyncio.to_thread(_cleanup_expired_reports_sync, threshold)
     if deleted:
         logger.info("expired report files cleaned: %s", deleted)
     return deleted
@@ -114,9 +118,10 @@ async def start_report_cleanup_runtime() -> None:
 async def stop_report_cleanup_runtime() -> None:
     global _report_cleanup_task
     task, _report_cleanup_task = _report_cleanup_task, None
-    if task is None or task.done():
+    if task is None:
         return
-    task.cancel()
+    if not task.done():
+        task.cancel()
     try:
         await task
     except asyncio.CancelledError:
@@ -159,19 +164,7 @@ def _new_report_path(session_dir: Path) -> Path:
 
 
 def _new_report_file_id() -> str:
-    return f"{_base36(int(time() * 1000))}-{uuid4().hex[:4]}"
-
-
-def _base36(value: int) -> str:
-    if value <= 0:
-        return "0"
-    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
-    result = ""
-    current = value
-    while current:
-        current, remainder = divmod(current, 36)
-        result = digits[remainder] + result
-    return result
+    return uuid4().hex
 
 
 def _write_text_atomic(path: Path, content: str) -> None:
@@ -192,6 +185,13 @@ def _write_text_atomic(path: Path, content: str) -> None:
         if temp_path is not None:
             temp_path.unlink(missing_ok=True)
         raise
+
+
+def _write_report_sync(session_dir: Path, content: str) -> tuple[Path, int]:
+    session_dir.mkdir(parents=True, exist_ok=True)
+    report_path = _new_report_path(session_dir)
+    _write_text_atomic(report_path, content)
+    return report_path, report_path.stat().st_size
 
 
 def _cleanup_expired_reports_sync(threshold: float) -> int:

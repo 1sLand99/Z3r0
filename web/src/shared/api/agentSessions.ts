@@ -1,4 +1,4 @@
-import { apiBlob, buildAuthenticatedWebSocketUrl, defineJsonEndpoint } from "./client";
+import { apiBlob, apiRequest, buildAuthenticatedWebSocketUrl, defineJsonEndpoint } from "./client";
 import { buildQuery } from "./query";
 import type {
   AgentTurnRequest,
@@ -7,8 +7,8 @@ import type {
   DeleteAgentSessionResponse,
   DownloadAgentReportPathParams,
   InterruptAgentSessionResponse,
-  ListAgentEventsParams,
-  ListAgentEventsResponse,
+  ListAgentTimelineParams,
+  ListAgentTimelineResponse,
   ListAgentSessionsParams,
   ListAgentSessionsResponse,
   SubmitAgentSessionTurnResponse,
@@ -20,9 +20,12 @@ import type {
 
 const AGENT_SESSIONS_PATH = "/api/agent-sessions";
 
-export const listAgentSessions = defineJsonEndpoint<[params: ListAgentSessionsParams], ListAgentSessionsResponse>(
-  "GET", (params) => `${AGENT_SESSIONS_PATH}${buildQuery(params)}`,
-);
+export function listAgentSessions(params: ListAgentSessionsParams, signal?: AbortSignal) {
+  return apiRequest<ListAgentSessionsResponse>(
+    `${AGENT_SESSIONS_PATH}${buildQuery(params)}`,
+    { signal },
+  );
+}
 export const createAgentSessionTurn = defineJsonEndpoint<[payload: AgentTurnRequest], CreateAgentSessionTurnResponse>(
   "POST", () => `${AGENT_SESSIONS_PATH}/turns`, (payload) => payload,
 );
@@ -36,16 +39,16 @@ export const cancelAllAgentSessionTasks = defineJsonEndpoint<[sessionId: string]
   "POST", (sessionId) => `${AGENT_SESSIONS_PATH}/${encodeURIComponent(sessionId)}/cancel-all`,
 );
 
-export function listAgentEvents(
+export function listAgentTimeline(
   sessionId: string,
-  params: ListAgentEventsParams = {},
+  params: ListAgentTimelineParams = {},
+  signal?: AbortSignal,
 ) {
-  return listAgentEventsEndpoint(sessionId, params);
+  return apiRequest<ListAgentTimelineResponse>(
+    `${AGENT_SESSIONS_PATH}/${encodeURIComponent(sessionId)}/timeline${buildQuery(params)}`,
+    { signal },
+  );
 }
-
-const listAgentEventsEndpoint = defineJsonEndpoint<
-  [sessionId: string, params: ListAgentEventsParams], ListAgentEventsResponse
->("GET", (sessionId, params) => `${AGENT_SESSIONS_PATH}/${encodeURIComponent(sessionId)}/events${buildQuery(params)}`);
 
 export const updateAgentSessionTitle = defineJsonEndpoint<
   [sessionId: string, payload: UpdateAgentSessionTitleRequest], UpdateAgentSessionTitleResponse

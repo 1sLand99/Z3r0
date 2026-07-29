@@ -2,9 +2,10 @@
 
 import asyncio
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum, auto
 from typing import Any
 
 from agents import Runner
@@ -24,10 +25,10 @@ from core.runtime.coordination import (
 )
 from core.runtime.input_items import build_turn_input_item, display_text_from_content, retrieval_text_from_content
 from core.runtime.live_projection import LiveEventProjection
-from core.runtime.notification_dispatch import signal_target_notifications
+from core.runtime.notification_dispatch import forget_target_notifications, signal_target_notifications
 from core.runtime.partial_context import DeltaBuffer, discard_partial_stream, incomplete_segment_events, track_delta
 from core.runtime.streaming import StreamIdleTimeout, next_segment_scope
-from core.runtime.timeline import TimelineLogWriter, is_persistable, timeline_item_key
+from core.runtime.timeline import TimelineLogWriter
 from core.sandbox.command_jobs import cancel_sandbox_async_commands, cancel_session_async_sandbox_commands
 from core.task_runtime import InterruptSignal, TurnTrigger, iter_interruptible_events, replace_trigger, run_until_idle
 from core.work_project import activate_work_project_context
@@ -36,6 +37,7 @@ from logger import get_logger
 from schema.agent.events import (
     AgentEventSchema,
     AgentInputPart,
+    AgentStreamFrameSchema,
     DoneEvent,
     ErrorEvent,
     RunStateEvent,
@@ -44,7 +46,7 @@ from schema.agent.events import (
 )
 from schema.agent.notifications import AgentNotificationSnapshot
 from service.agent import notifications as agent_notifications
-from service.agent.event_log import load_timeline_head
+from service.agent.event_log import load_timeline_state
 from service.agent.session_state import (
     force_mark_session_stopped as _force_mark_session_stopped,
     mark_session_running as _mark_session_running,
@@ -61,30 +63,43 @@ _SUBSCRIBER_REBASE_THRESHOLD = 512
 # the remaining work (prevents a hot relaunch loop on a persistent fault).
 _MAX_DRIVER_RELAUNCH = 5
 _DRIVER_RELAUNCH_BACKOFF_SECONDS = 0.5
-_SubscriberQueue = asyncio.Queue[AgentEventSchema | None]
+_SubscriberQueue = asyncio.Queue[AgentStreamFrameSchema | None]
 
 
 class AgentSessionAgentSwitchError(RuntimeError):
     pass
 
 
+class _SessionLifecycle(Enum):
+    IDLE = auto()
+    RUNNING = auto()
+    STOPPING = auto()
+    CLOSING = auto()
+    CLOSED = auto()
+
+
 class AgentSession:
     def __init__(self, session_id: str, registry: AgentRegistry) -> None:
         self.session_id = session_id
         self._registry = registry
-        self._start_lock = asyncio.Lock()
+        self._lifecycle_lock = asyncio.Lock()
+        self._stop_lock = asyncio.Lock()
+        self._projection_lock = asyncio.Lock()
         self._turn_lock = asyncio.Lock()
         self._current_task: asyncio.Task | None = None
+        self._driver_generation = 0
+        self._lifecycle = _SessionLifecycle.IDLE
         self._subscribers: set[_SubscriberQueue] = set()
         self._live_projection = LiveEventProjection()
-        # per-session timeline log: monotonic seq counter + first-seen key map
-        self._seq: int = 0
-        self._item_seq: dict[str, int] = {}
         self._timeline_loaded = False
+        self._accept_external_events = True
+        self._closing_requested = False
         self._log_writer = TimelineLogWriter(session_id)
+        self._close_task: asyncio.Task[None] | None = None
         self._main_agent_code: str = ""
         self._active_agent_code: str = ""
         self._active_agent_instance_id: str = ""
+        self._main_agent_instance_ids: set[str] = set()
         self._tool_snapshot: AgentToolSnapshot | None = None
         self._agent_graph: SessionAgentGraph | None = None
 
@@ -99,15 +114,17 @@ class AgentSession:
     def has_subscribers(self) -> bool:
         return bool(self._subscribers)
 
-    async def subscribe(
-        self,
-        include: Callable[[AgentEventSchema], bool] | None = None,
-    ) -> _SubscriberQueue:
-        snapshot = self._live_projection.snapshot(include)
-        queue: _SubscriberQueue = asyncio.Queue()
-        for event in snapshot:
-            queue.put_nowait(event)
-        self._subscribers.add(queue)
+    async def subscribe(self) -> _SubscriberQueue:
+        async with self._projection_lock:
+            if self._closing_requested or self._lifecycle in (
+                _SessionLifecycle.CLOSING,
+                _SessionLifecycle.CLOSED,
+            ):
+                raise RuntimeError("agent session is closing")
+            await self._ensure_timeline_loaded_locked()
+            queue: _SubscriberQueue = asyncio.Queue()
+            queue.put_nowait(self._live_projection.snapshot())
+            self._subscribers.add(queue)
         return queue
 
     def unsubscribe(self, queue: _SubscriberQueue) -> None:
@@ -118,36 +135,51 @@ class AgentSession:
         content: list[AgentInputPart],
         agent_code: str,
         context: AgentRuntimeContext,
-    ) -> list[AgentEventSchema]:
-        async with self._start_lock:
+    ) -> list[AgentStreamFrameSchema]:
+        async with self._lifecycle_lock:
+            self._raise_if_unavailable()
+            self._reap_finished_driver_locked()
             if self.is_running():
                 if self._active_agent_code and agent_code != self._active_agent_code:
                     raise AgentSessionAgentSwitchError(
                         "stop running tasks before switching agent"
                     )
                 return await self._enqueue_user_message(content, agent_code, context)
-            await _mark_session_running(
-                self.session_id,
-                agent_code=agent_code,
-                user_id=context.user.id,
-                sandbox_container_id=context.sandbox_container_id,
-                sandbox_container_generation=context.sandbox_container_generation,
-            )
-            await self._ensure_timeline_loaded()
-            events: list[AgentEventSchema] = [self._publish_run_state(True)]
-            events.append(await self._publish(UserMessageEvent(
-                created_at=datetime.now(),
-                content=content,
-                display_text=display_text_from_content(content),
-                target_agent_code=agent_code,
-            )))
+            try:
+                await _mark_session_running(
+                    self.session_id,
+                    agent_code=agent_code,
+                    user_id=context.user.id,
+                    sandbox_container_id=context.sandbox_container_id,
+                    sandbox_container_generation=context.sandbox_container_generation,
+                )
+                events = await self._publish_run_state(True)
+                events.extend(await self._publish(UserMessageEvent(
+                    created_at=datetime.now(),
+                    content=content,
+                    display_text=display_text_from_content(content),
+                    target_agent_code=agent_code,
+                )))
+            except Exception:
+                await _force_mark_session_stopped(self.session_id)
+                raise
+            self._driver_generation += 1
+            generation = self._driver_generation
             task = asyncio.create_task(
-                self._drive(content, agent_code, context, initial_user_event_published=True),
+                self._drive(
+                    content,
+                    agent_code,
+                    context,
+                    generation=generation,
+                    initial_user_event_published=True,
+                ),
                 name=f"agent-turn-{self.session_id}",
             )
             self._active_agent_code = agent_code
             self._active_agent_instance_id = context.agent_instance_id
-            self._current_task = task
+            self._main_agent_instance_ids.add(context.agent_instance_id)
+            self._set_driver(task)
+            self._lifecycle = _SessionLifecycle.RUNNING
             return events
 
     async def _enqueue_user_message(
@@ -155,12 +187,13 @@ class AgentSession:
         content: list[AgentInputPart],
         agent_code: str,
         context: AgentRuntimeContext,
-    ) -> list[AgentEventSchema]:
+    ) -> list[AgentStreamFrameSchema]:
         # Queue a high-priority notification (instead of interrupting) so the
         # running loop preempts at its next safe point without losing state.
         target_instance = self._active_agent_instance_id or context.agent_instance_id or main_agent_instance_id(
             context.session_id, context.user.id, agent_code,
         )
+        self._main_agent_instance_ids.add(target_instance)
         display_text = display_text_from_content(content)
         serialized_content = [part.model_dump() for part in content]
         await agent_notifications.enqueue_user_message_notification(
@@ -175,97 +208,248 @@ class AgentSession:
             sandbox_skill_metadata=context.sandbox_skill_metadata,
         )
         await signal_target_notifications(target_instance)
-        event = await self._publish(UserMessageEvent(
+        events = await self._publish(UserMessageEvent(
             created_at=datetime.now(),
             content=content,
             display_text=display_text,
             target_agent_code=agent_code,
         ))
-        return [event]
+        return events
 
     async def start_notification_recovery(self, context: AgentRuntimeContext, *, recovered: bool = True) -> bool:
         # Launch a driver that drains pending main notifications with no initial
         # turn. recovered=True (boot) surfaces queued user bubbles never shown in
         # this process; recovered=False is the in-process resume kick.
-        async with self._start_lock:
+        async with self._lifecycle_lock:
+            self._raise_if_unavailable()
+            self._reap_finished_driver_locked()
             if self.is_running():
                 return False
             if not await agent_notifications.has_pending_main_agent_notification(
                 session_id=self.session_id,
             ):
                 return False
-            await _mark_session_running(
-                self.session_id,
-                agent_code=context.agent_code,
-                user_id=context.user.id,
-                sandbox_container_id=context.sandbox_container_id,
-                sandbox_container_generation=context.sandbox_container_generation,
-            )
-            await self._ensure_timeline_loaded()
-            self._publish_run_state(True)
+            try:
+                await _mark_session_running(
+                    self.session_id,
+                    agent_code=context.agent_code,
+                    user_id=context.user.id,
+                    sandbox_container_id=context.sandbox_container_id,
+                    sandbox_container_generation=context.sandbox_container_generation,
+                )
+                await self._publish_run_state(True)
+            except Exception:
+                await _force_mark_session_stopped(self.session_id)
+                raise
+            self._driver_generation += 1
+            generation = self._driver_generation
             task = asyncio.create_task(
-                self._drive(None, context.agent_code or "", context, recovered=recovered),
+                self._drive(
+                    None,
+                    context.agent_code or "",
+                    context,
+                    generation=generation,
+                    recovered=recovered,
+                ),
                 name=f"agent-recovery-{self.session_id}",
             )
             self._active_agent_code = context.agent_code
             self._active_agent_instance_id = context.agent_instance_id
-            self._current_task = task
+            self._main_agent_instance_ids.add(context.agent_instance_id)
+            self._set_driver(task)
+            self._lifecycle = _SessionLifecycle.RUNNING
             return True
 
-    async def interrupt(self) -> list[AgentEventSchema]:
-        task = self._current_task
-        if task is None or task.done():
-            return []
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-        # The cancelled task's ``_finalize_interrupted_turn`` has already
-        # published a boundary ``*Complete`` event for any in-flight segment
-        # plus a ``DoneEvent`` so the live projection ends in a finalised
-        # state. We only need to (a) drop main-agent notifications the user
-        # explicitly abandoned and (b) update session liveness; freshly
-        # enqueued USER_MESSAGE notifications are preserved so the next
-        # idle cycle still honours them.
-        await agent_notifications.cancel_main_agent_interrupted_notifications(
-            self.session_id,
-            "Discarded by user interrupt.",
-        )
-        await _mark_session_stopped(self.session_id)
-        event = await self._publish_idle_if_inactive()
-        return [event] if event is not None else []
-
-    async def cancel_all(self) -> list[AgentEventSchema]:
-        events: list[AgentEventSchema] = []
-        task = self._current_task
-        if task is not None and not task.done():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+    async def interrupt(self) -> list[AgentStreamFrameSchema]:
+        async with self._stop_lock:
+            async with self._lifecycle_lock:
+                self._raise_if_unavailable()
+                task = self._current_task
+                if not self.is_running() or task is None:
+                    return []
+                self._lifecycle = _SessionLifecycle.STOPPING
+                task.cancel()
+            await _await_canceled_task(task)
+            await agent_notifications.cancel_main_agent_interrupted_notifications(
+                self.session_id,
+                "Discarded by user interrupt.",
+            )
             await _mark_session_stopped(self.session_id)
-            events.append(await self._publish(DoneEvent(created_at=datetime.now())))
-        await cancel_session_subagents(self.session_id)
-        await cancel_session_async_sandbox_commands(self.session_id)
-        await agent_notifications.cancel_session_notifications(
-            self.session_id,
-            "Agent session tasks canceled by user.",
-        )
-        await _force_mark_session_stopped(self.session_id)
-        events.append(self._publish_run_state(False))
-        return events
+            async with self._lifecycle_lock:
+                if self._current_task is task:
+                    self._clear_driver()
+                self._lifecycle = _SessionLifecycle.IDLE
+                events = await self._publish_run_state(False)
+                await self._forget_active_main_signal()
+            await self.flush_timeline()
+            return events
+
+    async def cancel_all(self) -> list[AgentStreamFrameSchema]:
+        async with self._stop_lock:
+            return await self._cancel_all_locked(final_state=_SessionLifecycle.IDLE)
 
     async def shutdown(self) -> None:
-        await self.cancel_all()
         await self.close()
 
     async def close(self) -> None:
-        self._close_subscribers()
-        await self._log_writer.stop()
-        self._timeline_loaded = False
-        await self._dispose_agent_graph()
+        self._closing_requested = True
+        close_task = self._close_task
+        if close_task is None:
+            close_task = asyncio.create_task(
+                self._close_resources(),
+                name=f"agent-session-close-{self.session_id}",
+            )
+            close_task.add_done_callback(self._consume_close_result)
+            self._close_task = close_task
+        try:
+            await asyncio.shield(close_task)
+        except asyncio.CancelledError as cancellation:
+            try:
+                await asyncio.shield(close_task)
+            except asyncio.CancelledError:
+                raise
+            except BaseException as exc:
+                raise cancellation from exc
+            raise
+
+    async def _close_resources(self) -> None:
+        failures: list[Exception] = []
+        async with self._stop_lock:
+            async with self._lifecycle_lock:
+                if self._lifecycle == _SessionLifecycle.CLOSED:
+                    return
+                self._lifecycle = _SessionLifecycle.CLOSING
+            try:
+                await self._cancel_all_locked(final_state=_SessionLifecycle.CLOSING)
+            except Exception as exc:
+                logger.error(
+                    "agent session cancellation failed during close session=%s",
+                    self.session_id,
+                    exc_info=(type(exc), exc, exc.__traceback__),
+                )
+                failures.append(exc)
+
+            async with self._projection_lock:
+                self._accept_external_events = False
+                self._close_subscribers()
+                if self._timeline_loaded:
+                    try:
+                        await self._log_writer.stop()
+                    except Exception as exc:
+                        logger.error(
+                            "timeline writer close failed session=%s",
+                            self.session_id,
+                            exc_info=(type(exc), exc, exc.__traceback__),
+                        )
+                        failures.append(exc)
+                    finally:
+                        self._timeline_loaded = False
+
+            try:
+                await self._dispose_agent_graph()
+            except Exception as exc:
+                logger.error(
+                    "agent graph close failed session=%s",
+                    self.session_id,
+                    exc_info=(type(exc), exc, exc.__traceback__),
+                )
+                failures.append(exc)
+
+            try:
+                await self._forget_active_main_signal()
+            except Exception as exc:
+                logger.error(
+                    "notification signal cleanup failed session=%s",
+                    self.session_id,
+                    exc_info=(type(exc), exc, exc.__traceback__),
+                )
+                failures.append(exc)
+
+            async with self._lifecycle_lock:
+                self._clear_driver()
+                self._lifecycle = _SessionLifecycle.CLOSED
+
+        if failures:
+            raise ExceptionGroup(f"agent session close failed: {self.session_id}", failures)
+
+    def _consume_close_result(self, task: asyncio.Task[None]) -> None:
+        if task.cancelled():
+            return
+        try:
+            exc = task.exception()
+        except asyncio.CancelledError:
+            return
+        if exc is not None:
+            logger.error(
+                "agent session close task failed session=%s",
+                self.session_id,
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
+
+    async def _cancel_all_locked(
+        self,
+        *,
+        final_state: _SessionLifecycle,
+    ) -> list[AgentStreamFrameSchema]:
+        async with self._lifecycle_lock:
+            if self._lifecycle == _SessionLifecycle.CLOSED:
+                return []
+            closing = self._lifecycle == _SessionLifecycle.CLOSING
+            if not closing:
+                self._lifecycle = _SessionLifecycle.STOPPING
+            task = self._current_task
+            if task is not None and not task.done():
+                task.cancel()
+        if task is not None:
+            await _await_canceled_task(task)
+        failures = await _gather_labeled_operations(
+            [
+                ("subagents", cancel_session_subagents(self.session_id)),
+                ("sandbox commands", cancel_session_async_sandbox_commands(self.session_id)),
+                (
+                    "notifications",
+                    agent_notifications.cancel_session_notifications(
+                        self.session_id,
+                        "Agent session tasks canceled by user.",
+                    ),
+                ),
+            ],
+            context=f"cancel agent session {self.session_id}",
+        )
+        await _force_mark_session_stopped(self.session_id)
+        async with self._lifecycle_lock:
+            self._clear_driver()
+            self._lifecycle = final_state
+            events = await self._publish_run_state(False)
+            await self._forget_active_main_signal()
+        await self.flush_timeline()
+        _raise_operation_failures(f"cancel agent session {self.session_id}", failures)
+        return events
+
+    async def claim_inactive_close(self) -> bool:
+        """Atomically prevent new turns/subscribers before pool eviction."""
+        async with self._lifecycle_lock:
+            task = self._current_task
+            stale_driver = self._lifecycle == _SessionLifecycle.RUNNING and task is not None and task.done()
+            if self._lifecycle != _SessionLifecycle.IDLE and not stale_driver:
+                return False
+            previous = self._lifecycle
+            previous_accept_external_events = self._accept_external_events
+            self._lifecycle = _SessionLifecycle.CLOSING
+            self._closing_requested = True
+            try:
+                async with self._projection_lock:
+                    if self._subscribers:
+                        self._lifecycle = previous
+                        self._closing_requested = False
+                        return False
+                    self._accept_external_events = False
+                    return True
+            except BaseException:
+                self._lifecycle = previous
+                self._closing_requested = False
+                self._accept_external_events = previous_accept_external_events
+                raise
 
     def _close_subscribers(self) -> None:
         for queue in tuple(self._subscribers):
@@ -273,16 +457,28 @@ class AgentSession:
         self._subscribers.clear()
 
     async def flush_timeline(self) -> None:
-        if self._timeline_loaded:
-            await self._log_writer.flush()
+        async with self._projection_lock:
+            if self._timeline_loaded:
+                await self._log_writer.flush()
 
     def uses_sandbox_container(self, container_id: int) -> bool:
         return self._tool_snapshot is not None and self._tool_snapshot.sandbox_container_id == container_id
 
     async def invalidate_tool_binding(self) -> None:
-        await self.cancel_all()
-        self._tool_snapshot = None
-        await self._dispose_agent_graph()
+        async with self._stop_lock:
+            async with self._lifecycle_lock:
+                if self._closing_requested or self._lifecycle in (
+                    _SessionLifecycle.CLOSING,
+                    _SessionLifecycle.CLOSED,
+                ):
+                    return
+            await self._cancel_all_locked(final_state=_SessionLifecycle.STOPPING)
+            async with self._lifecycle_lock:
+                if self._lifecycle in (_SessionLifecycle.CLOSING, _SessionLifecycle.CLOSED):
+                    return
+                self._tool_snapshot = None
+                await self._dispose_agent_graph()
+                self._lifecycle = _SessionLifecycle.IDLE
 
     async def _execute_turn(
         self,
@@ -491,6 +687,7 @@ class AgentSession:
         agent_code: str,
         context: AgentRuntimeContext,
         *,
+        generation: int,
         attempt: int = 0,
         recovered: bool = False,
         initial_user_event_published: bool = False,
@@ -501,7 +698,6 @@ class AgentSession:
         # resume_session. The finally only reconciles a post-drain claim race.
         async with self._turn_lock:
             task = asyncio.current_task()
-            self._current_task = task
             canceled = False
             try:
                 context.agent_code = agent_code
@@ -537,149 +733,130 @@ class AgentSession:
                 await self._publish(ErrorEvent(created_at=datetime.now(), message=str(exc) or "agent turn failed"))
                 await self._publish(DoneEvent(created_at=datetime.now()))
             finally:
-                relaunched = False
-                if not canceled:
-                    relaunched = await self._reconcile_driver(agent_code, context, attempt)
-                if self._current_task is task and not relaunched:
-                    self._current_task = None
-                    self._active_agent_code = ""
-                    self._active_agent_instance_id = ""
-                if not canceled and not relaunched:
-                    await _mark_session_stopped(self.session_id)
-                    await self._publish_idle_if_inactive()
+                if not canceled and task is not None:
+                    await self._settle_driver(
+                        task,
+                        generation=generation,
+                        agent_code=agent_code,
+                        context=context,
+                        attempt=attempt,
+                    )
 
-    async def _reconcile_driver(
+    async def _settle_driver(
         self,
+        task: asyncio.Task[Any],
+        *,
+        generation: int,
         agent_code: str,
         context: AgentRuntimeContext,
         attempt: int,
-    ) -> bool:
-        # Relaunch (under _start_lock) only if a claimable PENDING landed after the
-        # final drain; AWAITING obligations (running children) keep the session
-        # idle, not driving. Returns whether relaunched.
-        async with self._start_lock:
-            if not await agent_notifications.has_pending_notification(
-                session_id=self.session_id,
-                target_agent_instance_id=context.agent_instance_id,
-            ):
-                return False
-            if attempt >= _MAX_DRIVER_RELAUNCH:
-                logger.error(
-                    "agent driver relaunch budget exhausted session=%s target=%s; canceling outstanding work",
-                    self.session_id, context.agent_instance_id,
-                )
-                await agent_notifications.cancel_session_notifications(
-                    self.session_id, "Agent driver could not make progress.",
-                )
-                return False
-            new_task = asyncio.create_task(
-                self._relaunch_driver(
-                    _DRIVER_RELAUNCH_BACKOFF_SECONDS * attempt, agent_code, context, attempt + 1,
-                ),
-                name=f"agent-driver-relaunch-{self.session_id}",
+    ) -> None:
+        pending = await agent_notifications.has_pending_notification(
+            session_id=self.session_id,
+            target_agent_instance_id=context.agent_instance_id,
+        )
+        if pending and attempt >= _MAX_DRIVER_RELAUNCH:
+            logger.error(
+                "agent driver relaunch budget exhausted session=%s target=%s; canceling outstanding work",
+                self.session_id,
+                context.agent_instance_id,
             )
-            self._current_task = new_task
-            return True
+            await agent_notifications.cancel_session_notifications(
+                self.session_id,
+                "Agent driver could not make progress.",
+            )
+            pending = False
+
+        async with self._lifecycle_lock:
+            if (
+                self._lifecycle != _SessionLifecycle.RUNNING
+                or self._driver_generation != generation
+                or self._current_task is not task
+            ):
+                return
+            if pending:
+                new_task = asyncio.create_task(
+                    self._relaunch_driver(
+                        _DRIVER_RELAUNCH_BACKOFF_SECONDS * attempt,
+                        agent_code,
+                        context,
+                        generation,
+                        attempt + 1,
+                    ),
+                    name=f"agent-driver-relaunch-{self.session_id}",
+                )
+                self._set_driver(new_task)
+                return
+
+            self._clear_driver()
+            await _mark_session_stopped(self.session_id)
+            await self._publish_run_state(False)
+            await self._forget_active_main_signal()
+            await self.flush_timeline()
+            self._lifecycle = _SessionLifecycle.IDLE
 
     async def _relaunch_driver(
         self,
         delay: float,
         agent_code: str,
         context: AgentRuntimeContext,
+        generation: int,
         attempt: int,
     ) -> None:
         if delay > 0:
             await asyncio.sleep(delay)
-        await self._drive(None, agent_code, context, attempt=attempt)
+        await self._drive(None, agent_code, context, generation=generation, attempt=attempt)
 
-    def _publish_run_state(self, running: bool) -> RunStateEvent:
+    async def _publish_run_state(self, running: bool) -> list[AgentStreamFrameSchema]:
         event = RunStateEvent(created_at=datetime.now(), running=running)
-        if running:
-            self._live_projection.reset(event)
-        else:
-            self._live_projection.apply(event)
-        for queue in tuple(self._subscribers):
-            self._enqueue_or_rebase(queue, event)
-        if not running:
-            self._live_projection.reset(event)
-        return event
+        return await self._publish(event)
 
-    async def _publish_idle_if_inactive(self) -> RunStateEvent | None:
-        # Live run-state tracks the main agent only (idle-live UX): once it ends
-        # with no claimable PENDING turn, go idle even while sub-agents stream.
-        if self.is_running():
-            return None
-        if await agent_notifications.has_pending_main_agent_notification(session_id=self.session_id):
-            return None
-        return self._publish_run_state(False)
+    async def settle_idle(self) -> None:
+        async with self._lifecycle_lock:
+            if self._closing_requested or self._lifecycle != _SessionLifecycle.IDLE:
+                return
+            if await agent_notifications.has_pending_main_agent_notification(session_id=self.session_id):
+                return
+            await _mark_session_stopped(self.session_id)
+            await self._publish_run_state(False)
+            await self._forget_active_main_signal()
+            await self.flush_timeline()
 
-    async def _publish(self, event: AgentEventSchema) -> AgentEventSchema:
-        self.publish_external(event)
-        return event
+    async def _publish(self, event: AgentEventSchema) -> list[AgentStreamFrameSchema]:
+        return await self._project(event, allow_closing=True)
 
-    async def _ensure_timeline_loaded(self) -> None:
-        """Resume the seq counter + key map from the durable log, then start the writer.
-
-        Loading the existing key→seq map lets a re-pooled or recovered session
-        re-emit an already-persisted item (e.g. a running subagent_task) under
-        its original seq so live and stored frames keep one identity space.
-        """
+    async def _ensure_timeline_loaded_locked(self) -> None:
+        """Load the durable sequence head and active revision state once."""
         if self._timeline_loaded:
             return
-        max_seq, item_seq = await load_timeline_head(self.session_id)
-        if self._timeline_loaded:
-            return
-        self._seq = max(self._seq, max_seq)
-        for key, seq in item_seq.items():
-            self._item_seq.setdefault(key, seq)
+        max_sequence, active_items = await load_timeline_state(self.session_id)
+        self._live_projection.initialize(max_sequence, active_items)
         self._timeline_loaded = True
         self._log_writer.start()
 
-    def _stamp_event(self, event: AgentEventSchema) -> str | None:
-        """Stamp ``event.seq`` in place; return its durable item_key or None.
+    async def publish_external(self, event: AgentEventSchema) -> list[AgentStreamFrameSchema]:
+        return await self._project(event, allow_closing=False)
 
-        Keyless events (user_message/turn_boundary/error) consume a fresh seq
-        per emission; keyed events reuse the first-seen seq for their item_key.
-        Deltas and control frames receive a seq for ordering but are not stored.
-        """
-        if isinstance(event, (RunStateEvent, DoneEvent)):
-            return None
-        key = timeline_item_key(event)
-        if key is None:
-            self._seq += 1
-            event.seq = self._seq
-            persist_key = f"{event.type}:{self._seq}"
-        else:
-            seq = self._item_seq.get(key)
-            if seq is None:
-                self._seq += 1
-                seq = self._seq
-                self._item_seq[key] = seq
-            event.seq = seq
-            persist_key = key
-        if not is_persistable(event):
-            return None
-        return persist_key
+    async def _project(
+        self,
+        event: AgentEventSchema,
+        *,
+        allow_closing: bool,
+    ) -> list[AgentStreamFrameSchema]:
+        async with self._projection_lock:
+            self._raise_if_publish_unavailable(allow_closing=allow_closing)
+            await self._ensure_timeline_loaded_locked()
+            emission = self._live_projection.apply(event)
+            for item in emission.persist:
+                await self._log_writer.enqueue(item)
+            for frame in emission.frames:
+                for queue in tuple(self._subscribers):
+                    self._enqueue_or_rebase(queue, frame)
+            return list(emission.frames)
 
-    def publish_external(self, event: AgentEventSchema) -> bool:
-        """Inject an event into the session's unified event bus.
-
-        Used internally by ``_publish`` and externally via ``AgentSessionPool.publish``.
-        Returns whether a persistable event was accepted by the durable writer;
-        non-persistable control/delta frames return ``True`` once delivered to
-        subscribers/projection.
-        """
-        persist_key = self._stamp_event(event)
-        self._live_projection.apply(event)
-        for queue in tuple(self._subscribers):
-            self._enqueue_or_rebase(queue, event)
-        if persist_key is not None and self._timeline_loaded:
-            return self._log_writer.enqueue(persist_key, event.seq, event.model_dump_json(), event.created_at)
-        return persist_key is None
-
-    def _enqueue_or_rebase(self, queue: _SubscriberQueue, event: AgentEventSchema) -> None:
+    def _enqueue_or_rebase(self, queue: _SubscriberQueue, frame: AgentStreamFrameSchema) -> None:
         if queue.qsize() < _SUBSCRIBER_REBASE_THRESHOLD:
-            queue.put_nowait(event)
+            queue.put_nowait(frame)
             return
 
         while True:
@@ -688,18 +865,72 @@ class AgentSession:
             except asyncio.QueueEmpty:
                 break
 
-        snapshot = self._live_projection.snapshot()
-        if isinstance(event, RunStateEvent) and not event.running:
-            snapshot = [item for item in snapshot if not isinstance(item, RunStateEvent)]
-            snapshot.append(event)
-        for item in snapshot:
-            queue.put_nowait(item)
+        queue.put_nowait(self._live_projection.snapshot())
+
+    def _raise_if_unavailable(self) -> None:
+        if self._closing_requested or self._lifecycle in (
+            _SessionLifecycle.STOPPING,
+            _SessionLifecycle.CLOSING,
+            _SessionLifecycle.CLOSED,
+        ):
+            raise AgentSessionAgentSwitchError("agent session is stopping")
+
+    def _raise_if_publish_unavailable(self, *, allow_closing: bool) -> None:
+        if self._lifecycle == _SessionLifecycle.CLOSED or (
+            not allow_closing and (self._closing_requested or not self._accept_external_events)
+        ):
+            raise RuntimeError("agent session is closed")
+
+    def _set_driver(self, task: asyncio.Task[Any]) -> None:
+        task.add_done_callback(self._consume_driver_result)
+        self._current_task = task
+
+    def _reap_finished_driver_locked(self) -> None:
+        task = self._current_task
+        if self._lifecycle != _SessionLifecycle.RUNNING or task is None or not task.done():
+            return
+        self._consume_driver_result(task)
+        logger.error(
+            "reaping agent driver that exited before lifecycle settlement session=%s task=%s",
+            self.session_id,
+            task.get_name(),
+        )
+        self._clear_driver()
+        self._lifecycle = _SessionLifecycle.IDLE
+
+    def _consume_driver_result(self, task: asyncio.Task[Any]) -> None:
+        if task.cancelled():
+            return
+        try:
+            exc = task.exception()
+        except asyncio.CancelledError:
+            return
+        if exc is not None:
+            logger.error(
+                "agent driver task failed session=%s task=%s",
+                self.session_id,
+                task.get_name(),
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
+
+    def _clear_driver(self) -> None:
+        self._current_task = None
+        self._active_agent_code = ""
+        self._active_agent_instance_id = ""
+
+    async def _forget_active_main_signal(self) -> None:
+        instance_ids = tuple(self._main_agent_instance_ids)
+        self._main_agent_instance_ids.clear()
+        for instance_id in instance_ids:
+            if instance_id:
+                await forget_target_notifications(instance_id)
 
 
 @dataclass
 class _PooledSession:
     session: AgentSession
     last_used_at: float = field(default_factory=time.monotonic)
+    closing: bool = False
 
 
 @dataclass(frozen=True)
@@ -719,6 +950,7 @@ class AgentSessionPool:
         self._pool: dict[str, _PooledSession] = {}
         self._sweeper_task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
+        self._stopping = False
 
     @property
     def registry(self) -> AgentRegistry:
@@ -727,6 +959,7 @@ class AgentSessionPool:
     async def start(self) -> None:
         if self._sweeper_task is not None and not self._sweeper_task.done():
             return
+        self._stopping = False
         self._sweeper_task = asyncio.create_task(self._sweep_loop(), name="agent-pool-sweeper")
         logger.debug(
             "agent pool started (ttl=%ds, interval=%ds, max_size=%d)",
@@ -734,9 +967,11 @@ class AgentSessionPool:
         )
 
     async def stop(self) -> None:
+        self._stopping = True
         task, self._sweeper_task = self._sweeper_task, None
-        if task is not None and not task.done():
-            task.cancel()
+        if task is not None:
+            if not task.done():
+                task.cancel()
             try:
                 await task
             except asyncio.CancelledError:
@@ -745,13 +980,25 @@ class AgentSessionPool:
         async with self._lock:
             entries = list(self._pool.values())
             session_ids = list(self._pool.keys())
+            for entry in entries:
+                entry.closing = True
+        failures = await _gather_labeled_operations(
+            [
+                (f"session {session_id}", entry.session.shutdown())
+                for session_id, entry in zip(session_ids, entries, strict=True)
+            ],
+            context="stop agent session pool",
+        )
+        async with self._lock:
             self._pool.clear()
-        await asyncio.gather(*(entry.session.shutdown() for entry in entries), return_exceptions=True)
         await _mark_sessions_stopped(session_ids)
         logger.debug("agent pool stopped")
+        _raise_operation_failures("stop agent session pool", failures)
 
     async def get_or_create(self, session_id: str) -> AgentSession:
         async with self._lock:
+            if self._stopping:
+                raise AgentSessionAgentSwitchError("agent runtime is stopping")
             session = self._get_or_create_locked(session_id)
         await self._enforce_capacity(protected_session_id=session_id)
         return session
@@ -764,22 +1011,39 @@ class AgentSessionPool:
         await self._close_evicted(evicted, reason="LRU")
 
     def _get_or_create_locked(self, session_id: str) -> AgentSession:
+        if self._stopping:
+            raise AgentSessionAgentSwitchError("agent runtime is stopping")
         entry = self._pool.get(session_id)
         if entry is None:
             entry = _PooledSession(session=AgentSession(session_id, self._registry))
             self._pool[session_id] = entry
             logger.debug("agent pool created session=%s", session_id)
         else:
+            if entry.closing:
+                raise AgentSessionAgentSwitchError("agent session is stopping")
             entry.last_used_at = time.monotonic()
         return entry.session
 
     async def discard(self, session_id: str) -> None:
         async with self._lock:
-            entry = self._pool.pop(session_id, None)
+            entry = self._pool.get(session_id)
+            if entry is not None:
+                entry.closing = True
         if entry is None:
+            await cancel_session_subagents(session_id)
+            await cancel_session_async_sandbox_commands(session_id)
+            await agent_notifications.cancel_session_notifications(
+                session_id,
+                "Agent session tasks canceled by user.",
+            )
             await _force_mark_session_stopped(session_id)
             return
-        await entry.session.shutdown()
+        try:
+            await entry.session.shutdown()
+        finally:
+            async with self._lock:
+                if self._pool.get(session_id) is entry:
+                    self._pool.pop(session_id)
         logger.debug("agent pool discarded session=%s", session_id)
 
     async def invalidate_session_tool_binding(self, session_id: str) -> None:
@@ -795,48 +1059,46 @@ class AgentSessionPool:
         if entry is not None:
             await entry.session.flush_timeline()
 
-    async def try_interrupt(self, session_id: str) -> list[AgentEventSchema]:
+    async def main_agent_running(self, session_id: str) -> bool:
+        async with self._lock:
+            entry = self._pool.get(session_id)
+            return entry is not None and entry.session.is_running()
+
+    async def try_interrupt(self, session_id: str) -> list[AgentStreamFrameSchema]:
         async with self._lock:
             entry = self._pool.get(session_id)
         if entry is None:
             return []
         return await entry.session.interrupt()
 
-    async def subscribe(
-        self,
-        session_id: str,
-        include: Callable[[AgentEventSchema], bool] | None = None,
-    ) -> tuple[AgentSession, _SubscriberQueue]:
+    async def subscribe(self, session_id: str) -> tuple[AgentSession, _SubscriberQueue]:
         session = await self.get_or_create(session_id)
-        return session, await session.subscribe(include)
+        return session, await session.subscribe()
 
-    def publish(self, session_id: str, event: AgentEventSchema) -> bool:
-        """Route an external event to the session's unified event bus.
-
-        Lock-free: dict.get and attribute assignment are atomic in asyncio's
-        single-threaded model. Returns ``True`` when a pooled session with a
-        loaded timeline received and durably stored the event; ``False`` lets
-        the caller fall back to a direct persist (e.g. boot-time subagent
-        status changes for sessions that are not pooled yet).
-        """
-        entry = self._pool.get(session_id)
+    async def publish(self, session_id: str, event: AgentEventSchema) -> list[AgentStreamFrameSchema]:
+        async with self._lock:
+            entry = self._pool.get(session_id)
+            if entry is None and self._stopping:
+                raise AgentSessionAgentSwitchError("agent runtime is stopping")
+            if entry is not None and entry.closing:
+                raise AgentSessionAgentSwitchError("agent session is stopping")
+            session = entry.session if entry is not None else self._get_or_create_locked(session_id)
         if entry is None:
-            return False
-        entry.last_used_at = time.monotonic()
-        return entry.session.publish_external(event)
+            await self._enforce_capacity(protected_session_id=session_id)
+        return await session.publish_external(event)
 
     async def settle_session_idle(self, session_id: str) -> None:
         # Wind down a session with no pending main turn (e.g. a canceled task):
         # mark the DB run stopped (no-op while other work is active) and publish
         # run_state=false for a pooled, non-running session.
-        entry = self._pool.get(session_id)
-        if entry is not None and entry.session.is_running():
-            return
-        await _mark_session_stopped(session_id)
+        async with self._lock:
+            entry = self._pool.get(session_id)
         if entry is not None:
-            await entry.session._publish_idle_if_inactive()
+            await entry.session.settle_idle()
+        else:
+            await _mark_session_stopped(session_id)
 
-    async def cancel_all(self, session_id: str) -> list[AgentEventSchema]:
+    async def cancel_all(self, session_id: str) -> list[AgentStreamFrameSchema]:
         async with self._lock:
             entry = self._pool.get(session_id)
         if entry is None:
@@ -864,8 +1126,12 @@ class AgentSessionPool:
             ])
         if not tasks:
             return
-        await asyncio.gather(*tasks, return_exceptions=True)
+        failures = await _gather_labeled_operations(
+            [(f"operation {index}", task) for index, task in enumerate(tasks, start=1)],
+            context=f"invalidate tool bindings container={container_id}",
+        )
         logger.debug("agent pool invalidated tool bindings container=%s count=%d", container_id, len(entries))
+        _raise_operation_failures(f"invalidate tool bindings container={container_id}", failures)
 
     async def _sweep_loop(self) -> None:
         while True:
@@ -917,43 +1183,78 @@ class AgentSessionPool:
     ) -> list[tuple[str, _PooledSession]]:
         if not candidates or limit == 0:
             return []
-        eviction_ids: list[str] = []
+        eligible: list[_EvictionCandidate] = []
         for candidate in candidates:
-            if limit is not None and len(eviction_ids) >= limit:
-                break
-            sid = candidate.session_id
             entry = candidate.entry
-            if entry.session.is_running() or entry.session.has_subscribers():
+            if entry.closing or entry.session.is_running() or entry.session.has_subscribers():
                 continue
             if entry.last_used_at != candidate.last_used_at:
                 continue
-            if await agent_notifications.has_active_session_notifications(session_id=sid):
-                continue
-            eviction_ids.append(sid)
-        if not eviction_ids:
+            eligible.append(candidate)
+        if not eligible:
             return []
 
-        observed_last_used = {candidate.session_id: candidate.last_used_at for candidate in candidates}
-        evicted: list[tuple[str, _PooledSession]] = []
+        active_ids = await agent_notifications.active_session_ids(
+            [candidate.session_id for candidate in eligible]
+        )
+        eligible = [candidate for candidate in eligible if candidate.session_id not in active_ids]
+        if limit is not None:
+            eligible = eligible[:limit]
+        if not eligible:
+            return []
+
+        claimed_entries: list[tuple[str, _PooledSession]] = []
         async with self._lock:
-            for sid in eviction_ids:
+            for candidate in eligible:
+                sid = candidate.session_id
                 entry = self._pool.get(sid)
-                if entry is None:
+                if entry is not candidate.entry or entry.closing:
                     continue
                 if entry.session.is_running() or entry.session.has_subscribers():
                     continue
-                observed = observed_last_used.get(sid)
-                if observed is None or entry.last_used_at != observed:
+                if entry.last_used_at != candidate.last_used_at:
                     continue
-                evicted.append((sid, self._pool.pop(sid)))
+                entry.closing = True
+                claimed_entries.append((sid, entry))
+
+        close_claims: dict[str, bool] = {}
+        for sid, entry in claimed_entries:
+            try:
+                close_claims[sid] = await entry.session.claim_inactive_close()
+            except BaseException as exc:
+                logger.error(
+                    "agent pool claim close failed session=%s",
+                    sid,
+                    exc_info=(type(exc), exc, exc.__traceback__),
+                )
+                close_claims[sid] = False
+
+        evicted: list[tuple[str, _PooledSession]] = []
+        async with self._lock:
+            for sid, candidate_entry in claimed_entries:
+                entry = self._pool.get(sid)
+                if entry is not candidate_entry:
+                    continue
+                if close_claims.get(sid, False):
+                    evicted.append((sid, entry))
+                else:
+                    entry.closing = False
         return evicted
 
     async def _close_evicted(self, evicted: list[tuple[str, _PooledSession]], *, reason: str) -> None:
         if not evicted:
             return
-        await asyncio.gather(*(entry.session.close() for _, entry in evicted), return_exceptions=True)
+        failures = await _gather_labeled_operations(
+            [(f"session {sid}", entry.session.close()) for sid, entry in evicted],
+            context=f"close {reason} evictions",
+        )
+        async with self._lock:
+            for sid, entry in evicted:
+                if self._pool.get(sid) is entry:
+                    self._pool.pop(sid, None)
         for sid, _ in evicted:
             logger.debug("agent pool evicted %s session=%s", reason, sid)
+        _raise_operation_failures(f"close {reason} evictions", failures)
 
 
 _pool: AgentSessionPool | None = None
@@ -1040,8 +1341,56 @@ def _next_turn_scope(context: AgentRuntimeContext) -> str:
     return next_segment_scope(owner)
 
 
-def _publish_to_current_pool(session_id: str, event: AgentEventSchema) -> bool:
-    return get_agent_pool().publish(session_id, event)
+async def _publish_to_current_pool(session_id: str, event: AgentEventSchema) -> None:
+    await get_agent_pool().publish(session_id, event)
+
+
+async def _await_canceled_task(task: asyncio.Task[Any]) -> None:
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    except Exception as exc:
+        logger.error(
+            "agent task exited with an error during cancellation task=%s",
+            task.get_name(),
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
+
+
+async def _gather_labeled_operations(
+    operations: list[tuple[str, Awaitable[Any]]],
+    *,
+    context: str,
+) -> list[Exception]:
+    if not operations:
+        return []
+    results = await asyncio.gather(
+        *(operation for _, operation in operations),
+        return_exceptions=True,
+    )
+    failures: list[Exception] = []
+    for (label, _), result in zip(operations, results, strict=True):
+        if not isinstance(result, BaseException):
+            continue
+        if isinstance(result, Exception):
+            failure = result
+        else:
+            failure = RuntimeError(f"{label} terminated with {type(result).__name__}")
+            failure.__cause__ = result
+        logger.error(
+            "%s operation failed: %s",
+            context,
+            label,
+            exc_info=(type(result), result, result.__traceback__),
+        )
+        failures.append(failure)
+    return failures
+
+
+def _raise_operation_failures(context: str, failures: list[Exception]) -> None:
+    if failures:
+        raise ExceptionGroup(context, failures)
 
 
 set_agent_event_publisher(_publish_to_current_pool)

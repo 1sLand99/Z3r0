@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from schema.agent.events import AgentContentEventSchema, AgentEventSchema, AgentInputPart, validate_agent_input_content
+from schema.agent.events import AgentInputPart, AgentTimelineItemSchema, validate_agent_input_content
 from schema.common.responses import PaginatedResponse
 
 
@@ -42,12 +42,12 @@ class ListAgentSessionsResponse(PaginatedResponse[AgentSessionSummarySchema]):
     pass
 
 
-# a page of the persisted UI timeline log, ordered ascending by seq
-class ListAgentEventsResponse(BaseModel):
+# a turn-aligned page of the persisted UI timeline, ordered by sequence
+class ListAgentTimelineResponse(BaseModel):
     session_id: str
-    items: list[AgentContentEventSchema]
+    items: list[AgentTimelineItemSchema]
     has_more: bool = False
-    next_before_seq: int | None = None
+    next_before_sequence: int | None = None
 
 
 class AgentTurnRequest(BaseModel):
@@ -65,7 +65,8 @@ class AgentTurnRequest(BaseModel):
 class AgentTurnResponse(BaseModel):
     session_id: str
     session: AgentSessionSummarySchema
-    events: list[AgentEventSchema]
+    main_agent_running: bool
+    updates: list[AgentTimelineItemSchema]
 
 
 class UpdateAgentSessionTitleRequest(BaseModel):

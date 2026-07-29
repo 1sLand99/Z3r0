@@ -134,6 +134,7 @@ async def iter_interruptible_events(
             if not task.done():
                 task.cancel()
         await asyncio.gather(event_task, signal_task, return_exceptions=True)
+        await events.aclose()
 
 
 async def _anext(aiter: AsyncIterator[AgentEventSchema]) -> AgentEventSchema:

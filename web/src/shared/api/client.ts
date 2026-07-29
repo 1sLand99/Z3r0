@@ -6,6 +6,7 @@ type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   auth?: boolean;
+  signal?: AbortSignal;
 };
 
 type JsonRequestMethod = NonNullable<RequestOptions["method"]>;
@@ -15,6 +16,7 @@ type RawRequestOptions = {
   headers?: HeadersInit;
   body?: BodyInit;
   auth?: boolean;
+  signal?: AbortSignal;
 };
 
 export class ApiError extends Error {
@@ -69,8 +71,10 @@ export async function apiRequest<ResponsePayload>(path: string, options: Request
       method: options.method || "GET",
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: options.signal,
     });
   } catch (error) {
+    if (isAbortError(error)) throw error;
     throw new ApiError(0, {
       code: 0,
       message: error instanceof Error ? error.message : "Network request failed",
@@ -104,8 +108,10 @@ async function rawApiRequest(path: string, options: RawRequestOptions = {}) {
       method: options.method || "GET",
       headers,
       body: options.body,
+      signal: options.signal,
     });
   } catch (error) {
+    if (isAbortError(error)) throw error;
     throw new ApiError(0, {
       code: 0,
       message: error instanceof Error ? error.message : "Network request failed",
@@ -148,6 +154,10 @@ export function buildAuthenticatedWebSocketUrl(path: string, token = getStoredAc
   if (!token) throw new Error("missing access token");
   const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
   return `${wsScheme}://${window.location.host}${path}?token=${encodeURIComponent(token)}`;
+}
+
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function addAccessTokenHeader(headers: Headers, auth = true) {

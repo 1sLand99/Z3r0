@@ -29,6 +29,7 @@ from schema.work_project.workflow import (
     WorkProjectWorkLogRequest,
 )
 from service.work_project.assets import merge_work_project_assets, query_work_project_assets, update_work_project_asset, upsert_work_project_asset
+from service.work_project.completion import complete_work_project
 from service.work_project.evidence import create_work_project_evidence, invalidate_work_project_evidence, query_work_project_evidence
 from service.work_project.findings import query_work_project_findings, save_work_project_finding as save_work_project_finding_service
 from service.work_project.graph import (
@@ -842,7 +843,6 @@ async def complete_current_work_project(ctx: RunContextWrapper[AgentRuntimeConte
     project_id = _project_id(ctx)
     if project_id is None:
         return work_project_error("No WorkProject is bound to this session.")
-    from service.work_project.projects import complete_work_project
     error = await complete_work_project(project_id)
     return work_project_error(error) if error else work_project_success({"project_id": project_id, "status": "completed"})
 

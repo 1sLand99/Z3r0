@@ -153,6 +153,8 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
             shutdown_steps.append(("knowledge document runtime", stop_knowledge_document_runtime))
 
             set_tracing_disabled(True)
+            await get_agent_pool().start()
+            shutdown_steps.append(("agent pool", _stop_current_agent_pool))
             await start_async_sandbox_runtime()
             shutdown_steps.append(("sandbox command runtime", stop_async_sandbox_commands))
             await start_subagent_runtime()
@@ -160,8 +162,6 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
             await start_report_cleanup_runtime()
             shutdown_steps.append(("report cleanup runtime", stop_report_cleanup_runtime))
 
-            await get_agent_pool().start()
-            shutdown_steps.append(("agent pool", _stop_current_agent_pool))
             set_agent_tool_binding_invalidator(_invalidate_current_agent_tool_bindings)
             shutdown_steps.append(("agent tool bindings", _reset_agent_tool_bindings))
 

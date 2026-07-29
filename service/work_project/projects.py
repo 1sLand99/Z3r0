@@ -254,62 +254,6 @@ async def retry_work_project(
     return schema, True
 
 
-async def complete_work_project(project_id: int) -> str:
-    async with get_async_session() as session:
-        project = (await session.exec(
-            select(WorkProject).where(WorkProject.id == project_id).with_for_update()
-        )).one_or_none()
-        if project is None:
-            return "work project not found"
-        if project.status != WorkProjectStatus.ACTIVE:
-            return f"work project is {project.status}"
-        open_work = (await session.exec(select(WorkProjectWorkItem.id).where(
-            WorkProjectWorkItem.project_id == project_id,
-            WorkProjectWorkItem.status.not_in({WorkProjectWorkItemStatus.COMPLETED, WorkProjectWorkItemStatus.CANCELED}),
-        ).limit(1))).first()
-        if open_work is not None:
-            return "work project has non-terminal work items"
-        suspected = (await session.exec(select(WorkProjectFinding.id).where(
-            WorkProjectFinding.project_id == project_id,
-            WorkProjectFinding.verification == WorkProjectFindingVerification.SUSPECTED,
-        ).limit(1))).first()
-        if suspected is not None:
-            return "work project has suspected findings that require validation, refutation, or deferral"
-        in_scope_assets = set((await session.exec(select(WorkProjectAsset.id).where(
-            WorkProjectAsset.project_id == project_id,
-            WorkProjectAsset.scope == WorkProjectAssetScope.IN_SCOPE,
-        ))).all())
-        covered_assets = set((await session.exec(
-            select(WorkProjectWorkItemTarget.asset_id)
-            .join(WorkProjectWorkItem, WorkProjectWorkItem.id == WorkProjectWorkItemTarget.work_item_id)
-            .where(
-                WorkProjectWorkItem.project_id == project_id,
-                WorkProjectWorkItem.status == WorkProjectWorkItemStatus.COMPLETED,
-                WorkProjectWorkItemTarget.status.in_({WorkProjectTargetStatus.COVERED, WorkProjectTargetStatus.DEFERRED}),
-            )
-        )).all())
-        if not in_scope_assets.issubset(covered_assets):
-            return "work project has in-scope assets without a covered or deferred target conclusion"
-        paths = list((await session.exec(select(WorkProjectAttackPath).where(WorkProjectAttackPath.project_id == project_id))).all())
-        steps = list((await session.exec(select(WorkProjectAttackPathStep).where(WorkProjectAttackPathStep.project_id == project_id))).all())
-        steps_by_path: dict[int, list[WorkProjectAttackPathStepSchema]] = {}
-        for step in steps:
-            steps_by_path.setdefault(step.path_id, []).append(WorkProjectAttackPathStepSchema.model_validate(step))
-        for path in paths:
-            status = derive_attack_path_status(steps_by_path.get(path.id or 0, []), path.archived_at)
-            if status not in {
-                WorkProjectAttackPathStatus.VALIDATED,
-                WorkProjectAttackPathStatus.REFUTED,
-                WorkProjectAttackPathStatus.ARCHIVED,
-            }:
-                return "work project has unresolved attack paths"
-        project.status = WorkProjectStatus.COMPLETED
-        project.updated_at = datetime.now()
-        session.add(project)
-        await session.commit()
-    return ""
-
-
 async def query_work_projects_for_user(
     page: int,
     size: int,

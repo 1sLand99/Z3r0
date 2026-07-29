@@ -12,7 +12,7 @@ from model.sandbox.async_jobs import SandboxAsyncJob
 from model.agent.notifications import AgentNotification
 from model.agent.subordinates import AgentSubordinateTask
 from model.agent.message_meta import AgentMessageMeta
-from model.agent.event_log import AgentEventLog
+from model.agent.event_log import AgentTimelineItemRecord
 from model.agent.context_compactions import AgentContextCompaction
 from model.agent.sessions import AgentSessionMeta
 from model.sandbox.containers import SandboxContainer
@@ -51,7 +51,7 @@ _registered_models = [
     WorkProjectWorkItem, WorkProjectWorkItemTarget, WorkProjectWorkItemDependency, WorkProjectWorkLog,
     WorkProjectEvidence, WorkProjectRelationEvidence, WorkProjectFindingEvidence, WorkProjectAttackPathStepEvidence,
     AgentSessionMeta, AgentMessageMeta, AgentContextCompaction,
-    AgentSubordinateTask, AgentNotification, SandboxAsyncJob, AgentEventLog,
+    AgentSubordinateTask, AgentNotification, SandboxAsyncJob, AgentTimelineItemRecord,
 ]
 _registered_sdk_tables = [agent_sessions, agent_messages]
 

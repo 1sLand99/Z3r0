@@ -12,7 +12,10 @@ from service.system_user.locking import lock_system_user_lifecycle
 async def list_running_sessions() -> list[AgentSessionMeta]:
     async with get_async_session() as session:
         return list((await session.exec(
-            select(AgentSessionMeta).where(AgentSessionMeta.is_running.is_(True))
+            select(AgentSessionMeta).where(
+                AgentSessionMeta.is_running.is_(True),
+                AgentSessionMeta.is_deleting.is_(False),
+            )
         )).all())
 
 
@@ -28,9 +31,15 @@ async def mark_session_running(
         await lock_system_user_lifecycle(session, user_id)
         if await session.get(SystemUser, user_id) is None:
             raise PermissionError("system user no longer exists")
-        meta = await session.get(AgentSessionMeta, session_id)
+        meta = (await session.exec(
+            select(AgentSessionMeta)
+            .where(AgentSessionMeta.session_id == session_id)
+            .with_for_update()
+        )).first()
         if meta is None:
             return
+        if meta.is_deleting:
+            raise PermissionError("agent session is being deleted")
         if meta.project_id is not None:
             meta.owner_id = user_id
         meta.is_running = True
@@ -65,10 +74,7 @@ async def finish_session_run(session_id: str, *, error: str = "") -> None:
 async def mark_sessions_stopped(session_ids: list[str], *, error: str = "") -> None:
     if not session_ids:
         return
-    active_session_ids = {
-        session_id for session_id in session_ids
-        if await has_outstanding_session_work(session_id)
-    }
+    active_session_ids = await agent_notifications.active_session_ids(session_ids)
     async with get_async_session() as session:
         metas = (await session.exec(
             select(AgentSessionMeta).where(AgentSessionMeta.session_id.in_(session_ids))

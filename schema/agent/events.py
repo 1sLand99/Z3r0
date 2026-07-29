@@ -1,6 +1,6 @@
-from enum import StrEnum
 from datetime import datetime
 import base64
+from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -21,6 +21,34 @@ class AgentEventTypeSchema(StrEnum):
     SUBAGENT_TASK = "subagent_task"
     DONE = "done"
     ERROR = "error"
+
+
+class AgentTimelineItemTypeSchema(StrEnum):
+    USER_MESSAGE = "user_message"
+    TURN_BOUNDARY = "turn_boundary"
+    THINKING = "thinking"
+    TEXT = "text"
+    TOOL = "tool"
+    SUBAGENT = "subagent"
+    ERROR = "error"
+
+
+class AgentTimelineContentStateSchema(StrEnum):
+    STREAMING = "streaming"
+    COMPLETED = "completed"
+
+
+class AgentTimelineToolStateSchema(StrEnum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AgentStreamFrameTypeSchema(StrEnum):
+    SNAPSHOT = "snapshot"
+    ITEM_UPSERT = "item_upsert"
+    TEXT_APPEND = "text_append"
+    RUN_STATE = "run_state"
 
 
 class AgentInputPartTypeSchema(StrEnum):
@@ -92,9 +120,6 @@ AgentInputPart = Annotated[
 
 class _AgentScopedEvent(BaseModel):
     created_at: datetime
-    # per-session monotonic timeline ordinal stamped by the runtime event bus;
-    # 0 for control-only frames (run_state/done) that never enter the timeline
-    seq: int = 0
     agent_name: str = ""
     # when set, this event was streamed from inside a nested subagent call.
     # `nested_for` is the parent agent code; `nested_call_id` matches the
@@ -107,7 +132,6 @@ class _AgentScopedEvent(BaseModel):
 class UserMessageEvent(BaseModel):
     type: Literal[AgentEventTypeSchema.USER_MESSAGE] = AgentEventTypeSchema.USER_MESSAGE
     created_at: datetime
-    seq: int = 0
     content: list[AgentInputPart] = Field(min_length=1)
     display_text: str = ""
     # the agent this message was @-mentioned to; UI renders it as a "@<name>" chip
@@ -121,7 +145,6 @@ class TurnBoundaryEvent(_AgentScopedEvent):
 class RunStateEvent(BaseModel):
     type: Literal[AgentEventTypeSchema.RUN_STATE] = AgentEventTypeSchema.RUN_STATE
     created_at: datetime
-    seq: int = 0
     running: bool
 
 
@@ -190,21 +213,6 @@ class ErrorEvent(_AgentScopedEvent):
     code: str = ""
 
 
-# everything that shows up in stored history (DoneEvent is a stream control signal only)
-AgentContentEventSchema = Annotated[
-    UserMessageEvent
-    | TurnBoundaryEvent
-    | TextDeltaEvent
-    | TextCompleteEvent
-    | ThinkingDeltaEvent
-    | ThinkingCompleteEvent
-    | ToolCallEvent
-    | ToolResultEvent
-    | SubagentTaskEvent
-    | ErrorEvent,
-    Field(discriminator="type"),
-]
-
 AgentEventSchema = Annotated[
     UserMessageEvent
     | TurnBoundaryEvent
@@ -218,6 +226,133 @@ AgentEventSchema = Annotated[
     | SubagentTaskEvent
     | DoneEvent
     | ErrorEvent,
+    Field(discriminator="type"),
+]
+
+
+class _AgentTimelineItem(BaseModel):
+    item_id: str = Field(min_length=1)
+    sequence: int = Field(ge=1)
+    revision: int = Field(ge=1)
+    created_at: datetime
+    agent_name: str = ""
+    parent_item_id: str | None = None
+
+
+class AgentTimelineUserMessageItem(_AgentTimelineItem):
+    type: Literal[AgentTimelineItemTypeSchema.USER_MESSAGE] = AgentTimelineItemTypeSchema.USER_MESSAGE
+    content: list[AgentInputPart] = Field(min_length=1)
+    display_text: str = ""
+    target_agent_code: str = ""
+
+
+class AgentTimelineTurnBoundaryItem(_AgentTimelineItem):
+    type: Literal[AgentTimelineItemTypeSchema.TURN_BOUNDARY] = AgentTimelineItemTypeSchema.TURN_BOUNDARY
+
+
+class AgentTimelineThinkingItem(_AgentTimelineItem):
+    type: Literal[AgentTimelineItemTypeSchema.THINKING] = AgentTimelineItemTypeSchema.THINKING
+    text: str = ""
+    state: AgentTimelineContentStateSchema = AgentTimelineContentStateSchema.STREAMING
+
+
+class AgentTimelineTextItem(_AgentTimelineItem):
+    type: Literal[AgentTimelineItemTypeSchema.TEXT] = AgentTimelineItemTypeSchema.TEXT
+    text: str = ""
+    state: AgentTimelineContentStateSchema = AgentTimelineContentStateSchema.STREAMING
+
+
+class AgentTimelineAttachmentTypeSchema(StrEnum):
+    REPORT = "report"
+
+
+class AgentTimelineReportAttachment(BaseModel):
+    type: Literal[AgentTimelineAttachmentTypeSchema.REPORT] = AgentTimelineAttachmentTypeSchema.REPORT
+    report_id: str
+    filename: str
+    size: int = Field(ge=0)
+    chars: int = Field(ge=0)
+
+
+AgentTimelineAttachmentSchema = Annotated[
+    AgentTimelineReportAttachment,
+    Field(discriminator="type"),
+]
+
+
+class AgentTimelineToolItem(_AgentTimelineItem):
+    type: Literal[AgentTimelineItemTypeSchema.TOOL] = AgentTimelineItemTypeSchema.TOOL
+    call_id: str
+    name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    output: str = ""
+    state: AgentTimelineToolStateSchema = AgentTimelineToolStateSchema.PENDING
+    attachments: list[AgentTimelineAttachmentSchema] = Field(default_factory=list)
+
+
+class AgentTimelineSubagentItem(_AgentTimelineItem):
+    type: Literal[AgentTimelineItemTypeSchema.SUBAGENT] = AgentTimelineItemTypeSchema.SUBAGENT
+    run_id: str
+    parent_agent_code: str = ""
+    parent_agent_instance_id: str = ""
+    agent_code: str
+    status: AgentSubordinateStatus
+    result_preview: str = ""
+    error_preview: str = ""
+    result_chars: int = 0
+    error_chars: int = 0
+    truncated: bool = False
+    progress: str = ""
+
+
+class AgentTimelineErrorItem(_AgentTimelineItem):
+    type: Literal[AgentTimelineItemTypeSchema.ERROR] = AgentTimelineItemTypeSchema.ERROR
+    message: str
+    code: str = ""
+
+
+AgentTimelineItemSchema = Annotated[
+    AgentTimelineUserMessageItem
+    | AgentTimelineTurnBoundaryItem
+    | AgentTimelineThinkingItem
+    | AgentTimelineTextItem
+    | AgentTimelineToolItem
+    | AgentTimelineSubagentItem
+    | AgentTimelineErrorItem,
+    Field(discriminator="type"),
+]
+
+
+class AgentStreamSnapshotFrame(BaseModel):
+    type: Literal[AgentStreamFrameTypeSchema.SNAPSHOT] = AgentStreamFrameTypeSchema.SNAPSHOT
+    main_agent_running: bool
+    latest_sequence: int = Field(ge=0)
+    items: list[AgentTimelineItemSchema]
+
+
+class AgentStreamItemUpsertFrame(BaseModel):
+    type: Literal[AgentStreamFrameTypeSchema.ITEM_UPSERT] = AgentStreamFrameTypeSchema.ITEM_UPSERT
+    item: AgentTimelineItemSchema
+
+
+class AgentStreamTextAppendFrame(BaseModel):
+    type: Literal[AgentStreamFrameTypeSchema.TEXT_APPEND] = AgentStreamFrameTypeSchema.TEXT_APPEND
+    item_id: str = Field(min_length=1)
+    sequence: int = Field(ge=1)
+    revision: int = Field(ge=1)
+    delta: str
+
+
+class AgentStreamRunStateFrame(BaseModel):
+    type: Literal[AgentStreamFrameTypeSchema.RUN_STATE] = AgentStreamFrameTypeSchema.RUN_STATE
+    main_agent_running: bool
+
+
+AgentStreamFrameSchema = Annotated[
+    AgentStreamSnapshotFrame
+    | AgentStreamItemUpsertFrame
+    | AgentStreamTextAppendFrame
+    | AgentStreamRunStateFrame,
     Field(discriminator="type"),
 ]
 

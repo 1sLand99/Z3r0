@@ -24,6 +24,7 @@ class AgentSessionMeta(SQLModel, table=True):
     selected_sandbox_container_id: int | None = Field(default=None, index=True)
     selected_sandbox_container_generation: int = Field(default=0, sa_column=Column(BigInteger, nullable=False))
     is_running: bool = Field(default=False, index=True)
+    is_deleting: bool = Field(default=False, index=True)
     runtime_agent_code: str = Field(default="")
     runtime_sandbox_container_id: int | None = Field(default=None, index=True)
     runtime_sandbox_container_generation: int = Field(default=0, sa_column=Column(BigInteger, nullable=False))

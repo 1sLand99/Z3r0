@@ -1,38 +1,35 @@
 import type {
-  AgentContentEvent,
   AgentInputPart,
-  SubagentTaskEvent,
-  TextCompleteEvent,
-  ThinkingCompleteEvent,
-  ToolCallEvent,
-  ToolResultEvent,
-  ReportToolResultOutput,
+  AgentTimelineItem,
+  AgentTimelineReportAttachment,
+  AgentTimelineSubagentItem,
+  AgentTimelineToolItem,
 } from "../../shared/api/types";
 
 export type ThinkingItem = {
   kind: "thinking";
   id: string;
-  segmentId: ThinkingCompleteEvent["segment_id"];
-  text: ThinkingCompleteEvent["text"];
+  segmentId: string;
+  text: string;
   complete: boolean;
 };
 
 export type TextItem = {
   kind: "text";
   id: string;
-  segmentId: TextCompleteEvent["segment_id"];
-  text: TextCompleteEvent["text"];
+  segmentId: string;
+  text: string;
   complete: boolean;
 };
 
 export type ToolExecutionItem = {
   kind: "tool";
   id: string;
-  callId: ToolCallEvent["call_id"];
-  name: ToolCallEvent["name"];
-  arguments: NonNullable<ToolCallEvent["arguments"]>;
-  output: ToolResultEvent["output"];
-  isError: ToolResultEvent["is_error"];
+  callId: AgentTimelineToolItem["call_id"];
+  name: AgentTimelineToolItem["name"];
+  arguments: NonNullable<AgentTimelineToolItem["arguments"]>;
+  output: AgentTimelineToolItem["output"];
+  isError: boolean;
   resolved: boolean;
   nested?: NestedTranscript;
   subagentTask?: SubagentExecutionItem;
@@ -40,20 +37,19 @@ export type ToolExecutionItem = {
 
 export type SubagentExecutionItem = {
   kind: "subagent";
-  id: SubagentTaskEvent["run_id"];
-  createdAt: SubagentTaskEvent["created_at"];
-  runId: SubagentTaskEvent["run_id"];
-  parentAgentCode: SubagentTaskEvent["parent_agent_code"];
-  parentAgentInstanceId: SubagentTaskEvent["parent_agent_instance_id"];
-  agentCode: SubagentTaskEvent["agent_code"];
-  nestedCallId: SubagentTaskEvent["nested_call_id"];
-  status: SubagentTaskEvent["status"];
-  resultPreview: SubagentTaskEvent["result_preview"];
-  errorPreview: SubagentTaskEvent["error_preview"];
-  resultChars: SubagentTaskEvent["result_chars"];
-  errorChars: SubagentTaskEvent["error_chars"];
-  truncated: SubagentTaskEvent["truncated"];
-  progress: SubagentTaskEvent["progress"];
+  id: AgentTimelineSubagentItem["item_id"];
+  createdAt: AgentTimelineSubagentItem["created_at"];
+  runId: AgentTimelineSubagentItem["run_id"];
+  parentAgentCode: AgentTimelineSubagentItem["parent_agent_code"];
+  parentAgentInstanceId: AgentTimelineSubagentItem["parent_agent_instance_id"];
+  agentCode: AgentTimelineSubagentItem["agent_code"];
+  status: AgentTimelineSubagentItem["status"];
+  resultPreview: AgentTimelineSubagentItem["result_preview"];
+  errorPreview: AgentTimelineSubagentItem["error_preview"];
+  resultChars: AgentTimelineSubagentItem["result_chars"];
+  errorChars: AgentTimelineSubagentItem["error_chars"];
+  truncated: AgentTimelineSubagentItem["truncated"];
+  progress: AgentTimelineSubagentItem["progress"];
 };
 
 export type ErrorItem = { kind: "error"; id: string; message: string };
@@ -63,17 +59,17 @@ export type TranscriptBlock = ThinkingItem | TextItem | ExecutionItem | ErrorIte
 export type ReportAttachmentItem = {
   kind: "report";
   id: string;
-  callId: ToolResultEvent["call_id"];
-  reportId: ReportToolResultOutput["report_id"];
-  filename: ReportToolResultOutput["filename"];
-  size: ReportToolResultOutput["size"];
-  chars: ReportToolResultOutput["chars"];
+  callId: AgentTimelineToolItem["call_id"];
+  reportId: AgentTimelineReportAttachment["report_id"];
+  filename: AgentTimelineReportAttachment["filename"];
+  size: AgentTimelineReportAttachment["size"];
+  chars: AgentTimelineReportAttachment["chars"];
 };
 
 export type TranscriptAttachmentItem = ReportAttachmentItem;
 
 export type AgentTranscript = {
-  createdAt: AgentContentEvent["created_at"] | "";
+  createdAt: AgentTimelineItem["created_at"] | "";
   agentName: string;
   blocks: TranscriptBlock[];
   attachments: TranscriptAttachmentItem[];
@@ -85,7 +81,7 @@ export type ChatNode =
   | {
       kind: "user";
       id: string;
-      createdAt: AgentContentEvent["created_at"];
+      createdAt: AgentTimelineItem["created_at"];
       content: AgentInputPart[];
       displayText: string;
       targetAgentCode: string;
@@ -95,8 +91,6 @@ export type ChatNode =
 export type ChatState = {
   nodes: ChatNode[];
   streaming: boolean;
-  pendingNested: Record<string, AgentContentEvent[]>;
-  liveFrom: number | null;
 };
 
 export type StreamingItem = ThinkingItem | TextItem;

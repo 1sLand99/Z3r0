@@ -1,21 +1,18 @@
 import asyncio
 from uuid import uuid4
 
-from pydantic import TypeAdapter
-from sqlalchemy import delete, exists, func, text
+from sqlalchemy import delete, exists, func, text, update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from core.agent.constants import DEFAULT_AGENT_CODE
-from core.runtime.coordination import cancel_session_subagents
 from core.runtime.session import get_agent_pool, get_agent_registry
-from core.sandbox.command_jobs import cancel_session_async_sandbox_commands
 from database import get_async_session
 from logger import get_logger
 from model.agent.sessions import AgentSessionMeta
 from model.system_user.users import SystemUser
 from model.work_project.projects import WorkProject, WorkProjectOwner
-from schema.agent.events import AgentContentEventSchema
+from schema.agent.events import AgentTimelineItemSchema
 from schema.agent.sessions import AgentSessionSummarySchema, SessionType
 from schema.system_user.users import SystemUserRole
 from service.agent.event_log import fetch_timeline_page
@@ -28,10 +25,8 @@ from utils.sdk_tables import agent_messages, agent_sessions
 logger = get_logger(__name__)
 
 _TITLE_MAX_LEN = 80
-DEFAULT_REPLAY_EVENT_PAGE_SIZE = 80
+DEFAULT_TIMELINE_PAGE_SIZE = 80
 _SESSION_TEARDOWN_BATCH_SIZE = 32
-
-_content_event_adapter: TypeAdapter[AgentContentEventSchema] = TypeAdapter(AgentContentEventSchema)
 
 
 async def create_session(user_id: int) -> str:
@@ -133,10 +128,11 @@ async def _list_sessions(
     project_id: int | None = None,
 ) -> Page[AgentSessionSummarySchema]:
     meta_table = AgentSessionMeta.__table__
-    stmt = _session_summary_statement().order_by(
+    stmt = _session_list_statement().order_by(
         agent_sessions.c.updated_at.desc(),
         agent_sessions.c.session_id.desc(),
     )
+    stmt = stmt.where(meta_table.c.is_deleting.is_(False))
     if project_id is None:
         stmt = stmt.where(
             meta_table.c.project_id.is_(None),
@@ -161,17 +157,35 @@ async def _list_sessions(
         metas = {meta.session_id: meta for meta in (await session.exec(
             select(AgentSessionMeta).where(AgentSessionMeta.session_id.in_(session_ids))
         )).all()}
+        message_counts = dict((await session.execute(
+            select(
+                agent_messages.c.session_id,
+                func.count(agent_messages.c.id),
+            )
+            .where(agent_messages.c.session_id.in_(session_ids))
+            .group_by(agent_messages.c.session_id)
+        )).all())
 
     return Page(
         page=page,
         size=size,
         total=page_result.total,
-        items=[_summary_from_row(row, metas.get(row.session_id)) for row in rows],
+        items=[
+            _summary_from_row(
+                row,
+                metas.get(row.session_id),
+                message_count=int(message_counts.get(row.session_id, 0)),
+            )
+            for row in rows
+        ],
     )
 
 
 async def _session_summary_by_id(session_id: str) -> AgentSessionSummarySchema | None:
-    stmt = _session_summary_statement().where(agent_sessions.c.session_id == session_id)
+    stmt = _session_summary_statement().where(
+        agent_sessions.c.session_id == session_id,
+        AgentSessionMeta.is_deleting.is_(False),
+    )
     async with get_async_session() as session:
         row = (await session.execute(stmt)).first()
         if row is None:
@@ -205,7 +219,28 @@ def _session_summary_statement():
     )
 
 
-def _summary_from_row(row, meta: AgentSessionMeta | None) -> AgentSessionSummarySchema:
+def _session_list_statement():
+    return (
+        select(
+            agent_sessions.c.session_id,
+            agent_sessions.c.created_at,
+            agent_sessions.c.updated_at,
+        )
+        .select_from(
+            agent_sessions.join(
+                AgentSessionMeta.__table__,
+                agent_sessions.c.session_id == AgentSessionMeta.__table__.c.session_id,
+            )
+        )
+    )
+
+
+def _summary_from_row(
+    row,
+    meta: AgentSessionMeta | None,
+    *,
+    message_count: int | None = None,
+) -> AgentSessionSummarySchema:
     session_type = meta.session_type if meta else SessionType.CHAT
     return AgentSessionSummarySchema(
         session_id=row.session_id,
@@ -223,7 +258,11 @@ def _summary_from_row(row, meta: AgentSessionMeta | None) -> AgentSessionSummary
         run_started_at=meta.run_started_at if meta else None,
         run_finished_at=meta.run_finished_at if meta else None,
         run_error=meta.run_error if meta else "",
-        message_count=row.message_count or 0,
+        message_count=(
+            message_count
+            if message_count is not None
+            else int(getattr(row, "message_count", 0) or 0)
+        ),
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -248,54 +287,40 @@ async def update_session_sandbox_container(
     return await session_summary(session_id, user_id=user_id, user_role=user_role)
 
 
-async def replay_session_events(
+async def load_session_timeline(
     session_id: str,
     user_id: int,
     user_role: SystemUserRole,
-) -> tuple[list[AgentContentEventSchema], bool, int | None] | None:
-    return await replay_session_events_page(
+) -> tuple[list[AgentTimelineItemSchema], bool, int | None] | None:
+    return await load_session_timeline_page(
         session_id=session_id,
         user_id=user_id,
         user_role=user_role,
-        before_seq=None,
-        limit=DEFAULT_REPLAY_EVENT_PAGE_SIZE,
+        before_sequence=None,
+        limit=DEFAULT_TIMELINE_PAGE_SIZE,
     )
 
 
-async def replay_session_events_page(
+async def load_session_timeline_page(
     session_id: str,
     user_id: int,
     user_role: SystemUserRole,
     *,
-    before_seq: int | None,
+    before_sequence: int | None,
     limit: int,
-) -> tuple[list[AgentContentEventSchema], bool, int | None] | None:
-    """Return one turn-aligned page of the persisted UI timeline, by seq cursor.
-
-    The timeline log already stores the exact wire events (with stable identity
-    and seq), so replay is a straight read + validate — no SDK-message
-    derivation, identity remapping, or content-based de-duplication.
-    """
+) -> tuple[list[AgentTimelineItemSchema], bool, int | None] | None:
+    """Return one turn-aligned page of revisioned timeline items."""
     async with get_async_session() as session:
         if not await _can_access_session(session, session_id, user_id, user_role):
             return None
 
     await get_agent_pool().flush_timeline(session_id)
 
-    items, has_more, next_before_seq = await fetch_timeline_page(
+    return await fetch_timeline_page(
         session_id,
-        before_seq=before_seq,
+        before_sequence=before_sequence,
         limit=max(1, limit),
     )
-
-    events: list[AgentContentEventSchema] = []
-    for seq, payload in items:
-        payload["seq"] = seq
-        try:
-            events.append(_content_event_adapter.validate_python(payload))
-        except Exception:
-            logger.debug("skipping malformed timeline payload session=%s seq=%s", session_id, seq)
-    return events, has_more, next_before_seq
 
 
 async def can_access_session(session_id: str, user_id: int, user_role: SystemUserRole) -> bool:
@@ -331,13 +356,36 @@ async def delete_session(
         return False
 
     async with get_async_session() as session:
-        meta = await session.get(AgentSessionMeta, session_id)
-        if meta is None or not await _can_access_meta(session, meta, user_id, user_role):
+        meta = (await session.exec(
+            select(AgentSessionMeta)
+            .where(AgentSessionMeta.session_id == session_id)
+            .with_for_update()
+        )).first()
+        if (
+            meta is None
+            or meta.is_deleting
+            or not await _can_manage_meta(session, meta, user_id, user_role)
+        ):
             return False
         if meta.project_id is not None and not allow_project_session:
             return False
+        meta.is_deleting = True
+        session.add(meta)
+        await session.commit()
 
-    await _teardown_session_runtime(session_id)
+    try:
+        await _teardown_session_runtime(session_id)
+    except BaseException:
+        try:
+            async with get_async_session() as session:
+                meta = await session.get(AgentSessionMeta, session_id)
+                if meta is not None:
+                    meta.is_deleting = False
+                    session.add(meta)
+                    await session.commit()
+        except Exception:
+            logger.exception("failed to restore agent session deletion state: %s", session_id)
+        raise
 
     async with get_async_session() as session:
         meta = (await session.exec(
@@ -345,7 +393,7 @@ async def delete_session(
             .where(AgentSessionMeta.session_id == session_id)
             .with_for_update()
         )).first()
-        if meta is None or not await _can_access_meta(session, meta, user_id, user_role):
+        if meta is None or not await _can_manage_meta(session, meta, user_id, user_role):
             return False
         if meta.project_id is not None and not allow_project_session:
             return False
@@ -369,6 +417,14 @@ async def delete_private_sessions_for_owner(owner_id: int) -> int:
     if not session_ids:
         return 0
 
+    async with get_async_session() as session:
+        await session.execute(
+            update(AgentSessionMeta)
+            .where(AgentSessionMeta.session_id.in_(session_ids))
+            .values(is_deleting=True)
+        )
+        await session.commit()
+
     for offset in range(0, len(session_ids), _SESSION_TEARDOWN_BATCH_SIZE):
         await asyncio.gather(*(
             _teardown_session_runtime(session_id)
@@ -385,8 +441,6 @@ async def delete_private_sessions_for_owner(owner_id: int) -> int:
 
 
 async def _teardown_session_runtime(session_id: str) -> None:
-    await cancel_session_subagents(session_id)
-    await cancel_session_async_sandbox_commands(session_id)
     await get_agent_pool().discard(session_id)
 
 
@@ -428,6 +482,17 @@ async def _can_access_session(
 
 
 async def _can_access_meta(
+    session: AsyncSession,
+    meta: AgentSessionMeta,
+    user_id: int,
+    user_role: SystemUserRole,
+) -> bool:
+    if meta.is_deleting:
+        return False
+    return await _can_manage_meta(session, meta, user_id, user_role)
+
+
+async def _can_manage_meta(
     session: AsyncSession,
     meta: AgentSessionMeta,
     user_id: int,

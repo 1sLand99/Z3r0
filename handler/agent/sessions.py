@@ -14,12 +14,12 @@ from handler.common.websocket import (
 )
 from logger import get_logger
 from middleware.system_user import AuthUser, resolve_current_user
-from schema.agent.events import AgentEventSchema
+from schema.agent.events import AgentStreamFrameSchema, AgentStreamItemUpsertFrame
 from schema.agent.sessions import (
     AgentSessionSummarySchema,
     AgentTurnRequest,
     AgentTurnResponse,
-    ListAgentEventsResponse,
+    ListAgentTimelineResponse,
     ListAgentSessionsResponse,
     UpdateAgentSessionSandboxContainerRequest,
     UpdateAgentSessionTitleRequest,
@@ -148,46 +148,45 @@ async def list_agent_sessions_handler(
     ))
 
 
-async def list_agent_events_handler(
+async def list_agent_timeline_handler(
     session_id: str,
     user: AuthUser,
-    before_seq: int | None = None,
-    limit: int = agent_sessions.DEFAULT_REPLAY_EVENT_PAGE_SIZE,
-) -> CommonResponse[ListAgentEventsResponse]:
-    result = await agent_sessions.replay_session_events_page(
+    before_sequence: int | None = None,
+    limit: int = agent_sessions.DEFAULT_TIMELINE_PAGE_SIZE,
+) -> CommonResponse[ListAgentTimelineResponse]:
+    result = await agent_sessions.load_session_timeline_page(
         session_id=session_id,
         user_id=user.id,
         user_role=user.role,
-        before_seq=before_seq,
+        before_sequence=before_sequence,
         limit=limit,
     )
     if result is None:
         raise_api_error(HTTPStatus.NOT_FOUND, "agent session not found")
-    events, has_more, next_before_seq = result
-    return CommonResponse(data=ListAgentEventsResponse(
+    items, has_more, next_before_sequence = result
+    return CommonResponse(data=ListAgentTimelineResponse(
         session_id=session_id,
-        items=events,
+        items=items,
         has_more=has_more,
-        next_before_seq=next_before_seq,
+        next_before_sequence=next_before_sequence,
     ))
 
 
 async def download_agent_report_handler(report_id: str, user: AuthUser) -> FileResponse:
     try:
-        report_path = agent_reports.resolve_report_download_path(report_id)
+        report_path, session_id, filename = await agent_reports.resolve_report_download(report_id)
     except ValueError as exc:
         raise_api_error(HTTPStatus.BAD_REQUEST, str(exc))
     except FileNotFoundError as exc:
         raise_api_error(HTTPStatus.NOT_FOUND, str(exc))
 
-    session_id = agent_reports.report_session_id(report_path)
     if not session_id or not await agent_sessions.can_access_session(session_id, user.id, user.role):
         raise_api_error(HTTPStatus.NOT_FOUND, "report file not found")
 
     return FileResponse(
         report_path,
         media_type="text/markdown; charset=utf-8",
-        filename=agent_reports.report_download_filename(report_path),
+        filename=filename,
     )
 
 
@@ -202,7 +201,7 @@ async def handle_agent_stream(websocket: WebSocket, session_id: str, token: str)
 
     await websocket.accept()
     session = None
-    event_queue: asyncio.Queue[AgentEventSchema | None] | None = None
+    event_queue: asyncio.Queue[AgentStreamFrameSchema | None] | None = None
     reader: asyncio.Task | None = None
     forwarder: asyncio.Task | None = None
 
@@ -244,7 +243,7 @@ async def _consume_websocket(websocket: WebSocket) -> None:
 
 async def _send_event(
     websocket: WebSocket,
-    event: AgentEventSchema,
+    event: AgentStreamFrameSchema,
 ) -> bool:
     if (
         websocket.client_state != WebSocketState.CONNECTED
@@ -263,7 +262,7 @@ _ACCESS_CHECK_INTERVAL_SECONDS = 30
 
 async def _forward_events(
     websocket: WebSocket,
-    queue: asyncio.Queue[AgentEventSchema | None],
+    queue: asyncio.Queue[AgentStreamFrameSchema | None],
     session_id: str,
     user: AuthUser,
 ) -> None:
@@ -306,7 +305,7 @@ async def _forward_events(
 async def _turn_response(
     session_id: str,
     user: AuthUser,
-    events: list[AgentEventSchema],
+    frames: list[AgentStreamFrameSchema],
 ) -> CommonResponse[AgentTurnResponse]:
     summary = await agent_sessions.session_summary(
         session_id,
@@ -315,7 +314,14 @@ async def _turn_response(
     )
     if summary is None:
         raise_api_error(HTTPStatus.NOT_FOUND, "agent session not found")
-    return CommonResponse(data=AgentTurnResponse(session_id=session_id, session=summary, events=events))
+    updates = [frame.item for frame in frames if isinstance(frame, AgentStreamItemUpsertFrame)]
+    main_agent_running = await get_agent_pool().main_agent_running(session_id)
+    return CommonResponse(data=AgentTurnResponse(
+        session_id=session_id,
+        session=summary,
+        main_agent_running=main_agent_running,
+        updates=updates,
+    ))
 
 
 def _raise_runtime_error(exc: Exception) -> None:
