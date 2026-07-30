@@ -1,20 +1,10 @@
 import { Button, Spin } from "@douyinfe/semi-ui";
-import { ArrowDown, AtSign, RotateCcw, Sparkles } from "lucide-react";
-import {
-  forwardRef,
-  memo,
-  useCallback,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type HTMLAttributes,
-} from "react";
-import { Virtuoso, type Components, type VirtuosoHandle } from "react-virtuoso";
+import { AtSign, RotateCcw, Sparkles } from "lucide-react";
+import { memo, useCallback, useMemo, useState, type RefObject } from "react";
 import { AGENT_INPUT_PART_TYPE } from "../../shared/api/generated/constants";
 import type { AgentImageInputPart, AgentInfo, AgentInputPart } from "../../shared/api/types";
 import { formatDateTime } from "../../shared/lib/date";
+import { cx } from "../../shared/lib/className";
 import { ImagePreview, imageDataUrl, type ImagePreviewState } from "./ImagePreview";
 import type { AgentTranscript, ChatNode } from "./chatState";
 import { TranscriptContent } from "./Transcript";
@@ -27,24 +17,16 @@ type ChatStreamProps = {
   loading: boolean;
   loadingPrevious: boolean;
   historyError: string | null;
-  hasPrevious: boolean;
-  firstItemIndex: number;
   agents: AgentInfo[];
   selectedSubagent: SubagentSelection | null;
-  onLoadPrevious: () => void;
+  tailRef: RefObject<HTMLDivElement | null>;
   onRetryHistory: () => void;
   onOpenSubagent: (selection: SubagentSelection) => void;
 };
 
-type PendingAgentItem = {
-  kind: "pending-agent";
-  id: string;
-  agentName: string;
-};
-
-type ChatListItem = ChatNode | PendingAgentItem;
-
-const AT_BOTTOM_THRESHOLD_PX = 24;
+type RenderedChatNode =
+  | { kind: "user"; node: Extract<ChatNode, { kind: "user" }>; targetName: string }
+  | { kind: "agent"; node: Extract<ChatNode, { kind: "agent" }>; agentName: string; live: boolean };
 
 export function ChatStream({
   nodes,
@@ -52,21 +34,20 @@ export function ChatStream({
   loading,
   loadingPrevious,
   historyError,
-  hasPrevious,
-  firstItemIndex,
   agents,
   selectedSubagent,
-  onLoadPrevious,
+  tailRef,
   onRetryHistory,
   onOpenSubagent,
 }: ChatStreamProps) {
-  const virtuosoRef = useRef<VirtuosoHandle | null>(null);
-  const previousLastNodeIdRef = useRef<string | null>(null);
   const [preview, setPreview] = useState<ImagePreviewState>(null);
-  const [atBottom, setAtBottom] = useState(true);
   const agentNameByCode = useMemo(
     () => new Map(agents.map((agent) => [agent.code, agent.name])),
     [agents],
+  );
+  const renderedNodes = useMemo(
+    () => buildRenderedChatNodes(nodes, streaming, agentNameByCode),
+    [agentNameByCode, nodes, streaming],
   );
   const openImagePreview = useCallback((image: AgentImageInputPart, index: number) => {
     setPreview({
@@ -76,116 +57,14 @@ export function ChatStream({
   }, []);
   const closeImagePreview = useCallback(() => setPreview(null), []);
   const lastNode = nodes[nodes.length - 1];
-  const pendingAgent = streaming && lastNode?.kind === "user";
-  const pendingAgentName = pendingAgent
-    ? resolveAgentName(agentNameByCode, lastNode.targetAgentCode)
-    : "";
-  const items = useMemo<ChatListItem[]>(() => (
-    pendingAgent
-      ? [...nodes, {
-          kind: "pending-agent",
-          id: `pending-agent:${lastNode.id}`,
-          agentName: pendingAgentName,
-        }]
-      : nodes
-  ), [lastNode, nodes, pendingAgent, pendingAgentName]);
-  const hasRenderableMessages = useMemo(
-    () => items.some((item) => item.kind !== "agent" || !isTranscriptEmpty(item)),
-    [items],
-  );
-  const components = useMemo<Components<ChatListItem>>(() => (
-    loadingPrevious
-      ? { List: ChatList, Header: HistoryLoader }
-      : { List: ChatList }
-  ), [loadingPrevious]);
-  const itemContent = useCallback((index: number, node: ChatListItem) => {
-    if (node.kind === "pending-agent") {
-      return (
-        <AgentBlock
-          agentName={node.agentName}
-          transcript={emptyAgentTranscript()}
-          live
-          selectedSubagent={selectedSubagent}
-          onOpenSubagent={onOpenSubagent}
-        />
-      );
-    }
-    if (node.kind === "user") {
-      return (
-        <UserBubble
-          content={node.content}
-          displayText={node.displayText}
-          targetName={resolveAgentName(agentNameByCode, node.targetAgentCode)}
-          createdAt={node.createdAt}
-          onPreviewImage={openImagePreview}
-        />
-      );
-    }
-    return (
-      <AgentBlock
-        agentName={node.agentName || resolveAgentName(agentNameByCode, node.targetAgentCode)}
-        transcript={node}
-        live={streaming && index === items.length - 1}
-        selectedSubagent={selectedSubagent}
-        onOpenSubagent={onOpenSubagent}
-      />
-    );
-  }, [agentNameByCode, items.length, onOpenSubagent, openImagePreview, selectedSubagent, streaming]);
-  const startReached = useCallback(() => {
-    if (hasPrevious && !loading && !loadingPrevious) onLoadPrevious();
-  }, [hasPrevious, loading, loadingPrevious, onLoadPrevious]);
-  const scrollToLatest = useCallback(() => {
-    virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "smooth" });
-  }, []);
-
-  useLayoutEffect(() => {
-    const currentLastNodeId = lastNode?.id ?? null;
-    const previousLastNodeId = previousLastNodeIdRef.current;
-    let appendedUserMessage = false;
-    if (previousLastNodeId !== null && previousLastNodeId !== currentLastNodeId) {
-      const previousTailIndex = nodes.findIndex((node) => node.id === previousLastNodeId);
-      if (previousTailIndex >= 0) {
-        for (let index = previousTailIndex + 1; index < nodes.length; index += 1) {
-          if (nodes[index]?.kind === "user") {
-            appendedUserMessage = true;
-            break;
-          }
-        }
-      }
-    }
-    previousLastNodeIdRef.current = currentLastNodeId;
-    if (appendedUserMessage) {
-      virtuosoRef.current?.scrollToIndex({ index: "LAST", align: "end", behavior: "auto" });
-    }
-  }, [lastNode, nodes]);
+  const pendingUser = streaming && lastNode?.kind === "user" ? lastNode : null;
+  const hasRenderableMessages = renderedNodes.length > 0 || pendingUser !== null;
 
   return (
-    <div className="chat-surface">
-      {hasRenderableMessages ? (
-        <Virtuoso
-          ref={virtuosoRef}
-          className="chat-viewport"
-          aria-label="Conversation messages"
-          data={items}
-          firstItemIndex={firstItemIndex}
-          initialTopMostItemIndex={{ index: "LAST", align: "end" }}
-          computeItemKey={(_index, node) => node.id}
-          components={components}
-          itemContent={itemContent}
-          followOutput
-          atBottomStateChange={setAtBottom}
-          atBottomThreshold={AT_BOTTOM_THRESHOLD_PX}
-          increaseViewportBy={{ top: 700, bottom: 900 }}
-          startReached={startReached}
-        />
-      ) : <ChatEmptyState />}
-      {loading && nodes.length === 0 ? (
-        <div className="chat-overlay-loading" aria-label="Loading conversation history">
-          <Spin spinning />
-        </div>
-      ) : null}
+    <div className={cx("chat-stream", hasRenderableMessages ? "chat-stream-has-messages" : "chat-stream-empty")}>
+      {loadingPrevious ? <HistoryLoader /> : null}
       {historyError ? (
-        <div className="chat-overlay-error" role="alert">
+        <div className="chat-history-error" role="alert">
           <span>{historyError}</span>
           <Button
             icon={<RotateCcw size={14} />}
@@ -198,31 +77,55 @@ export function ChatStream({
           </Button>
         </div>
       ) : null}
-      {hasRenderableMessages && !atBottom ? (
-        <Button
-          className="message-scroll-tail-floating chat-scroll-tail-floating"
-          icon={<ArrowDown size={16} />}
-          theme="solid"
-          type="tertiary"
-          onClick={scrollToLatest}
-          aria-label="Scroll to latest message"
+      {loading && !hasRenderableMessages ? <ChatLoadingState /> : null}
+      {!loading && !historyError && !hasRenderableMessages ? <ChatEmptyState /> : null}
+      {renderedNodes.map((item) => item.kind === "user" ? (
+        <UserBubble
+          key={item.node.id}
+          content={item.node.content}
+          displayText={item.node.displayText}
+          targetName={item.targetName}
+          createdAt={item.node.createdAt}
+          onPreviewImage={openImagePreview}
+        />
+      ) : (
+        <AgentBlock
+          key={item.node.id}
+          agentName={item.agentName}
+          transcript={item.node}
+          live={item.live}
+          selectedSubagent={selectedSubagent}
+          onOpenSubagent={onOpenSubagent}
+        />
+      ))}
+      {pendingUser ? (
+        <AgentBlock
+          key={`pending-agent:${pendingUser.id}`}
+          agentName={resolveAgentName(agentNameByCode, pendingUser.targetAgentCode)}
+          transcript={emptyAgentTranscript()}
+          live
+          selectedSubagent={selectedSubagent}
+          onOpenSubagent={onOpenSubagent}
         />
       ) : null}
+      <div ref={tailRef} className="chat-tail" />
       <ImagePreview preview={preview} onClose={closeImagePreview} />
     </div>
   );
 }
 
-const ChatList = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { style?: CSSProperties }>(
-  function ChatList({ children, className, ...props }, ref) {
-    return <div {...props} ref={ref} className={`chat-stream ${className ?? ""}`}>{children}</div>;
-  },
-);
-
 function HistoryLoader() {
   return (
     <div className="chat-history-loader" aria-label="Loading earlier messages">
       <Spin spinning size="small" />
+    </div>
+  );
+}
+
+function ChatLoadingState() {
+  return (
+    <div className="chat-loading" aria-label="Loading conversation history">
+      <Spin spinning />
     </div>
   );
 }
@@ -241,6 +144,36 @@ function ChatEmptyState() {
       </p>
     </div>
   );
+}
+
+function buildRenderedChatNodes(
+  nodes: ChatNode[],
+  streaming: boolean,
+  agentNameByCode: Map<string, string>,
+): RenderedChatNode[] {
+  const rendered: RenderedChatNode[] = [];
+  const lastIndex = nodes.length - 1;
+
+  nodes.forEach((node, index) => {
+    if (node.kind === "user") {
+      rendered.push({
+        kind: "user",
+        node,
+        targetName: resolveAgentName(agentNameByCode, node.targetAgentCode),
+      });
+      return;
+    }
+    const live = streaming && index === lastIndex;
+    if (!live && isTranscriptEmpty(node)) return;
+    rendered.push({
+      kind: "agent",
+      node,
+      agentName: node.agentName || resolveAgentName(agentNameByCode, node.targetAgentCode),
+      live,
+    });
+  });
+
+  return rendered;
 }
 
 function MessageTimestamp({ value }: { value: string }) {

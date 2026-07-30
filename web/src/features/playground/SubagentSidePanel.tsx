@@ -80,7 +80,6 @@ export const SubagentSidePanel = memo(function SubagentSidePanel({
           enabled={open}
           resetKey={selectionKey}
           scrollButtonClassName="subagent-scroll-tail-floating"
-          watch={[target]}
         >
           {(tailRef) => (
             <>

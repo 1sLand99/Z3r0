@@ -6,8 +6,6 @@ import {
   type TimelineRuntime,
 } from "./timelineRuntime";
 
-export const VIRTUAL_LIST_FIRST_ITEM_INDEX = 1_000_000;
-
 export type AgentSessionConnectionStatus = "idle" | "connecting" | "open" | "closed";
 
 export type SessionHistoryState = {
@@ -17,7 +15,7 @@ export type SessionHistoryState = {
   loadingPrevious: boolean;
   hasMoreBefore: boolean;
   beforeSequence: number | null;
-  firstItemIndex: number;
+  prependVersion: number;
 };
 
 export type SessionSocketState = {
@@ -59,7 +57,7 @@ export function createSessionRuntime(): SessionRuntime {
       loadingPrevious: false,
       hasMoreBefore: false,
       beforeSequence: null,
-      firstItemIndex: VIRTUAL_LIST_FIRST_ITEM_INDEX,
+      prependVersion: 0,
     },
     socket: { snapshotReceived: false },
     agentCodeOverride: "",
@@ -167,11 +165,10 @@ export function replaceSessionTimeline(
 }
 
 export function mergeInitialHistory(runtime: SessionRuntime, page: TimelinePage): SessionRuntime {
-  const previousNodeCount = runtime.timeline.state.nodes.length;
+  const previousNodes = runtime.timeline.state.nodes;
   const timeline = mergeTimelinePage(runtime.timeline, page.items);
-  const addedBeforeVisibleSnapshot = previousNodeCount > 0
-    ? Math.max(0, timeline.state.nodes.length - previousNodeCount)
-    : 0;
+  const projectionChangedBeforeVisibleSnapshot = previousNodes.length > 0
+    && timeline.state.nodes !== previousNodes;
   const withTimeline = replaceSessionTimeline(runtime, timeline);
   return {
     ...withTimeline,
@@ -182,7 +179,7 @@ export function mergeInitialHistory(runtime: SessionRuntime, page: TimelinePage)
       loadingInitial: false,
       hasMoreBefore: page.hasMore,
       beforeSequence: page.nextBeforeSequence,
-      firstItemIndex: Math.max(0, withTimeline.history.firstItemIndex - addedBeforeVisibleSnapshot),
+      prependVersion: withTimeline.history.prependVersion + (projectionChangedBeforeVisibleSnapshot ? 1 : 0),
     },
   };
 }
@@ -195,9 +192,9 @@ export function mergeLatestHistory(runtime: SessionRuntime, items: readonly Agen
 }
 
 export function mergePreviousHistory(runtime: SessionRuntime, page: TimelinePage): SessionRuntime {
-  const previousNodeCount = runtime.timeline.state.nodes.length;
+  const previousNodes = runtime.timeline.state.nodes;
   const timeline = prependTimelinePage(runtime.timeline, page.items);
-  const addedNodes = Math.max(0, timeline.state.nodes.length - previousNodeCount);
+  const projectionChanged = timeline.state.nodes !== previousNodes;
   const withTimeline = replaceSessionTimeline(runtime, timeline);
   return {
     ...withTimeline,
@@ -206,7 +203,7 @@ export function mergePreviousHistory(runtime: SessionRuntime, page: TimelinePage
       loadingPrevious: false,
       hasMoreBefore: page.hasMore,
       beforeSequence: page.nextBeforeSequence,
-      firstItemIndex: Math.max(0, withTimeline.history.firstItemIndex - addedNodes),
+      prependVersion: withTimeline.history.prependVersion + (projectionChanged ? 1 : 0),
     },
   };
 }

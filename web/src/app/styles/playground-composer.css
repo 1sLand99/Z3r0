@@ -1,7 +1,9 @@
 .playground-composer {
-  position: relative;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 6;
-  flex: 0 0 auto;
   min-width: 0;
   padding: 18px 36px 22px;
   animation: contentFadeUp 260ms var(--ease-emphasized) both;

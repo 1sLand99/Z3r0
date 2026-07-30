@@ -23,6 +23,18 @@
   box-sizing: border-box;
 }
 
+.playground-canvas {
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+}
+
+.playground-canvas-shell .message-scroll-viewport {
+  scroll-padding-top: 28px;
+  scroll-padding-bottom: calc(var(--playground-composer-clearance) + 12px);
+}
+
 .message-scroll-viewport:focus {
   outline: none;
 }
@@ -42,5 +54,5 @@
 
 .chat-scroll-tail-floating {
   right: max(57px, calc((100% - 1192px) / 2 + 57px));
-  bottom: 18px;
+  bottom: calc(var(--playground-composer-clearance) + 12px);
 }

@@ -1,29 +1,35 @@
-import { KeyboardEvent, RefObject, TouchEvent, WheelEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { KeyboardEvent, PointerEvent, RefObject, TouchEvent, WheelEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type UseAutoFollowScrollOptions<T extends HTMLElement> = {
+  contentRef?: RefObject<Element | null>;
   enabled?: boolean;
   containerRef: RefObject<T | null>;
+  forceFollowKey?: string | number | null;
+  onNearStart?: () => void;
   resetKey?: string | number | null;
-  watch?: readonly unknown[];
+  suspendAutoFollow?: boolean;
 };
 
-const watchObjectIds = new WeakMap<object, number>();
-let watchObjectIdSeq = 0;
+const NEAR_START_THRESHOLD_PX = 180;
 
 export function useAutoFollowScroll<T extends HTMLElement = HTMLDivElement>({
+  contentRef,
   enabled = true,
   containerRef,
+  forceFollowKey,
+  onNearStart,
   resetKey,
-  watch = [],
+  suspendAutoFollow = false,
 }: UseAutoFollowScrollOptions<T>) {
   const tailRef = useRef<HTMLDivElement | null>(null);
   const touchStartYRef = useRef<number | null>(null);
-  const lastScrollTopRef = useRef(0);
   const scrollFrameRef = useRef<number | null>(null);
   const followingRef = useRef(true);
+  const forceFollowKeyRef = useRef<string | number | null | undefined>(undefined);
+  const onNearStartRef = useRef(onNearStart);
   const [following, setFollowingState] = useState(true);
 
-  const watchKey = watch.map(watchIdentityKey).join("\u001f");
+  onNearStartRef.current = onNearStart;
 
   const setFollowing = useCallback((next: boolean) => {
     followingRef.current = next;
@@ -41,7 +47,6 @@ export function useAutoFollowScroll<T extends HTMLElement = HTMLDivElement>({
     container.style.scrollBehavior = "auto";
     container.scrollTo({ top: container.scrollHeight, behavior });
     container.style.scrollBehavior = previousBehavior;
-    if (behavior === "auto") lastScrollTopRef.current = container.scrollTop;
   }, [getContainer]);
 
   const scrollToLatest = useCallback(() => {
@@ -57,59 +62,65 @@ export function useAutoFollowScroll<T extends HTMLElement = HTMLDivElement>({
     });
   }, [scrollTail]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (resetKey == null) return;
     setFollowing(true);
-    lastScrollTopRef.current = 0;
     touchStartYRef.current = null;
-  }, [resetKey, setFollowing]);
+    scrollTail("auto");
+  }, [resetKey, scrollTail, setFollowing]);
 
   useEffect(() => {
     const container = enabled ? getContainer() : null;
     if (!container) return;
 
     const syncFollowing = () => {
-      const scrollingUp = container.scrollTop < lastScrollTopRef.current - 2;
-      lastScrollTopRef.current = container.scrollTop;
-
-      if (scrollingUp) {
-        setFollowing(false);
-        return;
+      if (container.scrollTop <= NEAR_START_THRESHOLD_PX) onNearStartRef.current?.();
+      if (!suspendAutoFollow && isNearScrollTail(container) && !followingRef.current) {
+        setFollowing(true);
       }
-
-      const atTail = isNearScrollTail(container);
-      if (atTail && !followingRef.current) setFollowing(true);
-      else if (!atTail && followingRef.current) setFollowing(false);
     };
 
     container.addEventListener("scroll", syncFollowing, { passive: true });
     return () => {
       container.removeEventListener("scroll", syncFollowing);
     };
-  }, [enabled, getContainer, setFollowing]);
+  }, [enabled, getContainer, setFollowing, suspendAutoFollow]);
 
   useLayoutEffect(() => {
-    if (!enabled || !followingRef.current) return;
+    if (Object.is(forceFollowKeyRef.current, forceFollowKey)) return;
+    forceFollowKeyRef.current = forceFollowKey;
+    if (!enabled || forceFollowKey == null) return;
+    setFollowing(true);
+    scrollTail("auto");
+  }, [enabled, forceFollowKey, scrollTail, setFollowing]);
+
+  useLayoutEffect(() => {
+    if (!enabled || suspendAutoFollow || !followingRef.current) return;
     scheduleTailScroll();
-  }, [enabled, following, resetKey, scheduleTailScroll, watchKey]);
+  }, [enabled, following, resetKey, scheduleTailScroll, suspendAutoFollow]);
 
   useEffect(() => {
     if (!enabled || typeof ResizeObserver === "undefined") return;
-    const content = tailRef.current?.parentElement;
+    const content = contentRef?.current ?? tailRef.current?.parentElement;
     if (!content) return;
     const observer = new ResizeObserver(() => {
+      const container = getContainer();
+      if (!container || suspendAutoFollow) return;
+      if (!hasScrollableOverflow(container) || isNearScrollTail(container)) {
+        if (!followingRef.current) setFollowing(true);
+      }
       if (followingRef.current) scheduleTailScroll();
     });
     observer.observe(content);
     return () => observer.disconnect();
-  }, [enabled, resetKey, scheduleTailScroll]);
+  }, [enabled, getContainer, resetKey, scheduleTailScroll, setFollowing, suspendAutoFollow]);
 
   useEffect(() => () => {
     if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
   }, []);
 
   const handleWheel = useCallback((event: WheelEvent<T>) => {
-    if (event.deltaY < 0) {
+    if (event.deltaY < 0 && hasScrollableOverflow(event.currentTarget)) {
       setFollowing(false);
     }
   }, [setFollowing]);
@@ -122,7 +133,13 @@ export function useAutoFollowScroll<T extends HTMLElement = HTMLDivElement>({
     const startY = touchStartYRef.current;
     const currentY = event.touches[0]?.clientY;
     if (startY == null || currentY == null || Math.abs(currentY - startY) <= 2) return;
-    if (currentY > startY) {
+    if (currentY > startY && hasScrollableOverflow(event.currentTarget)) {
+      setFollowing(false);
+    }
+  }, [setFollowing]);
+
+  const handlePointerDown = useCallback((event: PointerEvent<T>) => {
+    if (isVerticalScrollbarPointer(event) && hasScrollableOverflow(event.currentTarget)) {
       setFollowing(false);
     }
   }, [setFollowing]);
@@ -133,7 +150,7 @@ export function useAutoFollowScroll<T extends HTMLElement = HTMLDivElement>({
       case "ArrowUp":
       case "PageUp":
       case "Home":
-        setFollowing(false);
+        if (hasScrollableOverflow(event.currentTarget)) setFollowing(false);
         break;
       case "ArrowDown":
       case "PageDown":
@@ -152,6 +169,7 @@ export function useAutoFollowScroll<T extends HTMLElement = HTMLDivElement>({
     scrollHandlers: {
       onWheel: handleWheel,
       onKeyDown: handleKeyDown,
+      onPointerDown: handlePointerDown,
       onTouchStart: handleTouchStart,
       onTouchMove: handleTouchMove,
     },
@@ -162,15 +180,12 @@ function isNearScrollTail(container: HTMLElement) {
   return container.scrollHeight - container.scrollTop - container.clientHeight < 8;
 }
 
-function watchIdentityKey(value: unknown) {
-  if ((typeof value !== "object" && typeof value !== "function") || value === null) {
-    return String(value);
-  }
-  const objectValue = value as object;
-  let id = watchObjectIds.get(objectValue);
-  if (!id) {
-    id = ++watchObjectIdSeq;
-    watchObjectIds.set(objectValue, id);
-  }
-  return `ref:${id}`;
+function hasScrollableOverflow(container: HTMLElement) {
+  return container.scrollHeight > container.clientHeight + 1;
+}
+
+function isVerticalScrollbarPointer<T extends HTMLElement>(event: PointerEvent<T>) {
+  const container = event.currentTarget;
+  const bounds = container.getBoundingClientRect();
+  return event.clientX >= bounds.left + container.clientWidth;
 }

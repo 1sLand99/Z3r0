@@ -1,19 +1,43 @@
-.playground-workspace {
+.playground-shell {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 0;
-  width: 100%;
+  display: flex;
   height: 100%;
-  min-width: 0;
   min-height: 0;
   overflow: hidden;
   color: var(--z-text);
   background: transparent;
+}
+
+.playground-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.playground-conversation-frame {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   transition: grid-template-columns var(--motion-slow) var(--ease-emphasized);
 }
 
-.playground-workspace-subagent-open {
+.playground-shell-split .playground-conversation-frame {
   grid-template-columns: minmax(0, 1fr) minmax(360px, 38%);
+}
+
+.playground-main-column {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  --playground-composer-clearance: 0px;
 }
 
 .session-list {
@@ -221,13 +245,4 @@
   opacity: 1;
   pointer-events: auto;
   transform: scale(1);
-}
-
-.playground-conversation {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: transparent;
 }

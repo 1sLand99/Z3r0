@@ -1,12 +1,17 @@
 @media (max-width: 900px) {
-  .chat-stream {
+  .playground-shell {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .chat-stream-has-messages {
     padding-right: 18px;
     padding-left: 18px;
   }
 
   .chat-scroll-tail-floating {
     right: 37px;
-    bottom: 18px;
+    bottom: calc(var(--playground-composer-clearance) + 12px);
   }
 
   .subagent-scroll-tail-floating {
@@ -23,7 +28,7 @@
     border-radius: 16px;
   }
 
-  .playground-workspace-subagent-open {
+  .playground-shell-split .playground-conversation-frame {
     grid-template-columns: minmax(0, 1fr);
   }
 

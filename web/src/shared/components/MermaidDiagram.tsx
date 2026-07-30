@@ -146,14 +146,14 @@ async function runNextJob() {
     result = { error: error instanceof Error ? error.message : String(error) };
   }
   jobs.delete(job.source);
-  putCache(job.source, result);
+  if ("svg" in result) putCache(job.source, result);
   for (const consumer of job.consumers) consumer(result);
   running = false;
   scheduleQueue();
 }
 
-function putCache(source: string, result: RenderResult) {
-  const bytes = "svg" in result ? result.svg.length * 2 : result.error.length * 2;
+function putCache(source: string, result: Extract<RenderResult, { svg: string }>) {
+  const bytes = result.svg.length * 2;
   const existing = cache.get(source);
   if (existing) cacheBytes -= existing.bytes;
   cache.delete(source);

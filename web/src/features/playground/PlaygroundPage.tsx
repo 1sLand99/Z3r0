@@ -50,6 +50,7 @@ import {
 } from "./AgentSessionProvider";
 import { ChatStream } from "./ChatStream";
 import { Composer } from "./Composer";
+import { MessageScrollPanel } from "./MessageScrollPanel";
 import { SandboxSelector } from "./SandboxSelector";
 import { SubagentSidePanel } from "./SubagentSidePanel";
 import { useSubagentPanel } from "./useSubagentPanel";
@@ -192,7 +193,7 @@ export function PlaygroundPage() {
 
   // consume sessionId from navigate state (e.g. project "Go") then clear so
   // back-navigation does not retrigger the jump
-  useEffect(() => {
+  useLayoutEffect(() => {
     const incoming = (location.state as PlaygroundLocationState | null)?.sessionId;
     if (incoming) {
       selectSession(incoming);
@@ -596,58 +597,100 @@ function PlaygroundConversation({
   }, [activeSessionId, sandboxContainerId, send]);
   const handleInterrupt = useCallback(() => { void interrupt(); }, [interrupt]);
   const handleCancelAll = useCallback(() => { void cancelAll(); }, [cancelAll]);
-  const handleLoadPrevious = useCallback(() => {
-    void loadPreviousHistory(activeSessionId);
-  }, [activeSessionId, loadPreviousHistory]);
+  const handleLoadPrevious = useCallback(
+    () => loadPreviousHistory(activeSessionId),
+    [activeSessionId, loadPreviousHistory],
+  );
   const handleRetryHistory = useCallback(() => {
     retryInitialHistory(activeSessionId);
   }, [activeSessionId, retryInitialHistory]);
   const agentSwitchDisabled = activeAgentCode === defaultAgentCode && hasRunningSubagents;
+  const mainColumnRef = useRef<HTMLDivElement | null>(null);
+  const composerLayerRef = useRef<HTMLDivElement | null>(null);
+  const tailMessageId = useMemo(
+    () => chatState.nodes.at(-1)?.id ?? null,
+    [chatState.nodes],
+  );
+
+  useLayoutEffect(() => {
+    const column = mainColumnRef.current;
+    const composerLayer = composerLayerRef.current;
+    if (!column || !composerLayer) return;
+    const syncClearance = () => {
+      column.style.setProperty(
+        "--playground-composer-clearance",
+        `${Math.ceil(composerLayer.getBoundingClientRect().height)}px`,
+      );
+    };
+    syncClearance();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(syncClearance);
+    observer.observe(composerLayer);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <section className={cx("playground-workspace", selectedSubagent && "playground-workspace-subagent-open")}>
-      <div className="playground-conversation">
-        <ChatStream
-          key={activeSessionId ?? "new-chat"}
-          nodes={chatState.nodes}
-          streaming={chatState.streaming}
-          loading={runtime.history.loadingInitial}
-          loadingPrevious={runtime.history.loadingPrevious}
-          historyError={runtime.history.initialError}
-          hasPrevious={runtime.history.hasMoreBefore}
-          firstItemIndex={runtime.history.firstItemIndex}
-          agents={agents}
-          selectedSubagent={selectedSubagent}
-          onLoadPrevious={handleLoadPrevious}
-          onRetryHistory={handleRetryHistory}
-          onOpenSubagent={setSelectedSubagent}
-        />
-        <div className="playground-composer">
-          <Composer
-            key={activeSessionId ?? "new-chat"}
-            streaming={chatState.streaming}
-            disabled={Boolean(activeSessionId) && !runtime.history.initialLoaded}
-            agents={agents}
-            activeAgentCode={activeAgentCode}
-            agentSwitchDisabled={agentSwitchDisabled}
-            canCancelAll={hasRunningSubagents}
-            onPickAgent={setActiveAgentCode}
-            onSend={handleSend}
-            onInterrupt={handleInterrupt}
-            onCancelAll={handleCancelAll}
-          />
+    <section className={cx("playground-shell", selectedSubagent && "playground-shell-split")}>
+      <div className="playground-main">
+        <div className="playground-conversation-frame">
+          <div ref={mainColumnRef} className="playground-main-column">
+            <MessageScrollPanel
+              ariaLabel="Conversation messages"
+              className="playground-canvas-shell"
+              contentClassName="playground-canvas"
+              forceFollowKey={tailMessageId}
+              loadingPrevious={runtime.history.loadingPrevious}
+              onLoadPrevious={runtime.history.initialLoaded && runtime.history.hasMoreBefore
+                ? handleLoadPrevious
+                : undefined}
+              preserveScrollKey={runtime.history.prependVersion}
+              resetKey={activeSessionId ?? "new-chat"}
+              scrollButtonClassName="chat-scroll-tail-floating"
+            >
+              {(tailRef) => (
+                <ChatStream
+                  key={activeSessionId ?? "new-chat"}
+                  nodes={chatState.nodes}
+                  streaming={chatState.streaming}
+                  loading={runtime.history.loadingInitial}
+                  loadingPrevious={runtime.history.loadingPrevious}
+                  historyError={runtime.history.initialError}
+                  agents={agents}
+                  selectedSubagent={selectedSubagent}
+                  tailRef={tailRef}
+                  onRetryHistory={handleRetryHistory}
+                  onOpenSubagent={setSelectedSubagent}
+                />
+              )}
+            </MessageScrollPanel>
+            <div ref={composerLayerRef} className="playground-composer">
+              <Composer
+                key={activeSessionId ?? "new-chat"}
+                streaming={chatState.streaming}
+                disabled={Boolean(activeSessionId) && !runtime.history.initialLoaded}
+                agents={agents}
+                activeAgentCode={activeAgentCode}
+                agentSwitchDisabled={agentSwitchDisabled}
+                canCancelAll={hasRunningSubagents}
+                onPickAgent={setActiveAgentCode}
+                onSend={handleSend}
+                onInterrupt={handleInterrupt}
+                onCancelAll={handleCancelAll}
+              />
+            </div>
+          </div>
+          {selectedSubagent ? (
+            <SubagentSidePanel
+              nodes={chatState.nodes}
+              tabs={subagentTabs}
+              agents={agents}
+              selection={selectedSubagent}
+              onSelect={setSelectedSubagent}
+              onClose={closeSubagentPanel}
+            />
+          ) : null}
         </div>
       </div>
-      {selectedSubagent ? (
-        <SubagentSidePanel
-          nodes={chatState.nodes}
-          tabs={subagentTabs}
-          agents={agents}
-          selection={selectedSubagent}
-          onSelect={setSelectedSubagent}
-          onClose={closeSubagentPanel}
-        />
-      ) : null}
     </section>
   );
 }

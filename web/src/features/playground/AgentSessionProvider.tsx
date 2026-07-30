@@ -809,12 +809,13 @@ export function AgentSessionProvider({ children }: { children: ReactNode }) {
     }
     manualBlankSessionRef.current = sessionId === null && options.navigateBlank !== false;
     activeSessionIdRef.current = sessionId;
+    if (sessionId) loadHistory(sessionId);
     setActiveSessionId(sessionId);
     evictRuntimeCache();
     if (sessionId && previousSessionId === sessionId && !activeSocketRef.current) {
       connectForRef.current(sessionId);
     }
-  }, [abortSessionRequests, closeActiveSocket, evictRuntimeCache, runtimeStore]);
+  }, [abortSessionRequests, closeActiveSocket, evictRuntimeCache, loadHistory, runtimeStore]);
 
   const openLiveSession = useCallback((sessionId: string) => {
     updateRuntime(sessionId, (runtime) => ({
@@ -857,9 +858,10 @@ export function AgentSessionProvider({ children }: { children: ReactNode }) {
       runtimeStore.ensure(running.session_id);
       activeSelectionGenerationRef.current += 1;
       activeSessionIdRef.current = running.session_id;
+      loadHistory(running.session_id);
       setActiveSessionId(running.session_id);
     }
-  }, [activeSessionId, runtimeStore, sessions]);
+  }, [activeSessionId, loadHistory, runtimeStore, sessions]);
 
   useEffect(() => {
     const reconnectNow = () => {

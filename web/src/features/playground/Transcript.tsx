@@ -158,12 +158,20 @@ const MarkdownText = memo(function MarkdownText({ text, streaming }: { text: str
     if (renderTimerRef.current !== null) window.clearTimeout(renderTimerRef.current);
   }, []);
 
+  const visibleText = streaming ? renderText : text;
   const markdown = useMemo(
-    () => normalizeMarkdownForRender(renderText, streaming),
-    [renderText, streaming],
+    () => normalizeMarkdownForRender(visibleText, streaming),
+    [streaming, visibleText],
   );
-  if (!renderText && !streaming) return null;
-  return <MarkdownContent className="agent-text" content={markdown} mode="document" mermaid />;
+  if (!visibleText && !streaming) return null;
+  return (
+    <MarkdownContent
+      className="agent-text"
+      content={markdown}
+      mode="document"
+      mermaid
+    />
+  );
 });
 
 function ThinkingGroup({
