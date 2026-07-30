@@ -3,7 +3,7 @@ import { Activity, LogOut } from "lucide-react";
 import { ReactNode, Suspense, useCallback, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
 import { SessionList } from "../../features/playground/SessionList";
-import { useAgentSessionContext } from "../../features/playground/AgentSessionProvider";
+import { useAgentSessionDirectory } from "../../features/playground/AgentSessionProvider";
 import { useAuth } from "../../shared/auth/AuthProvider";
 import { SYSTEM_USER_ROLE } from "../../shared/api/generated/constants";
 import { cx } from "../../shared/lib/className";
@@ -43,7 +43,7 @@ export function AdminLayout() {
     loadMoreSessions,
     dropSessionRuntime,
     syncSessionSummaries,
-  } = useAgentSessionContext();
+  } = useAgentSessionDirectory();
 
   const setHeaderActions = useCallback((actions: ReactNode) => {
     setHeaderActionsState((current) => (Object.is(current, actions) ? current : actions));

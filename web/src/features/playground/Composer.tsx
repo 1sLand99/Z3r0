@@ -1,6 +1,6 @@
 import { Button, TextArea, Toast } from "@douyinfe/semi-ui";
 import { AtSign, ImagePlus, OctagonX, Send, Square, X } from "lucide-react";
-import { ClipboardEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ClipboardEvent, KeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgentPicker } from "./AgentPicker";
 import {
   AGENT_IMAGE_DETAIL,
@@ -31,7 +31,7 @@ const ACCEPTED_IMAGE_TYPES_ATTRIBUTE = AGENT_IMAGE_MEDIA_TYPE_VALUES.join(",");
 const MAX_AGENT_IMAGE_SIZE_LABEL = formatBinaryMegabytes(MAX_AGENT_IMAGE_BYTES);
 const MAX_AGENT_TOTAL_IMAGE_SIZE_LABEL = formatBinaryMegabytes(MAX_AGENT_TOTAL_IMAGE_BYTES);
 
-export function Composer({
+export const Composer = memo(function Composer({
   streaming,
   disabled = false,
   agents,
@@ -323,7 +323,7 @@ export function Composer({
       </div>
     </div>
   );
-}
+});
 
 function base64DecodedSize(value: string): number {
   const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;

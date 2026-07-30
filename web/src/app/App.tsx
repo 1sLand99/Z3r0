@@ -2,6 +2,7 @@ import { lazy, Suspense, type ComponentType } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useOutletContext } from "react-router-dom";
 import { AuthProvider, useAuth } from "../shared/auth/AuthProvider";
 import { SYSTEM_USER_ROLE } from "../shared/api/generated/constants";
+import { useAutoHideScrollbars } from "../shared/hooks/useAutoHideScrollbars";
 import { adminRoutes } from "./routeManifest";
 import { DEFAULT_ADMIN_PATH, LOGIN_PATH } from "./routePaths";
 import {
@@ -48,6 +49,8 @@ function PublicOnlyRoute() {
 }
 
 export function App() {
+  useAutoHideScrollbars();
+
   return (
     <AuthProvider>
       <BrowserRouter>

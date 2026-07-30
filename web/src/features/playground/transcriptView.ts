@@ -52,11 +52,19 @@ export function isTranscriptEmpty(transcript: AgentTranscript) {
 }
 
 export function activeThinkingItemId(blocks: TranscriptItem[]) {
-  return [...blocks].reverse().find((block): block is ThinkingItem => block.kind === "thinking" && !block.complete)?.id ?? "";
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index];
+    if (block.kind === "thinking" && !block.complete) return block.id;
+  }
+  return "";
 }
 
 export function activeTextItemId(blocks: TranscriptItem[]) {
-  return [...blocks].reverse().find((block): block is TextItem => block.kind === "text" && !block.complete)?.id ?? "";
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index];
+    if (block.kind === "text" && !block.complete) return block.id;
+  }
+  return "";
 }
 
 export function transcriptHasRunningExecution(transcript: AgentTranscript): boolean {

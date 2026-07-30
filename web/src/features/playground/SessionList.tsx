@@ -16,10 +16,12 @@ import { FormField } from "../../shared/components/FormField";
 import { ResourceModal } from "../../shared/components/ResourceModal";
 import { useResourceSubmit } from "../../shared/hooks/useResourceSubmit";
 import { useMountedRef } from "../../shared/hooks/useMountedRef";
-import { mergeByKey } from "../../shared/lib/array";
+import { mergeByKey, stabilizeByKey } from "../../shared/lib/array";
 import { cx } from "../../shared/lib/className";
+import { shallowEqual } from "../../shared/lib/object";
 import { UI_TEXT } from "../../shared/lib/uiText";
 import { WorkProjectInfoModal } from "../work-projects/WorkProjectInfoModal";
+import { validAgentSessionSummaries } from "./agentStreamProtocol";
 
 const PROJECT_REFRESH_INTERVAL_MS = 5_000;
 
@@ -120,6 +122,14 @@ export function SessionList({
   const projectSessionBusyRef = useRef<Set<number>>(new Set());
   const { saving: renaming, submit } = useResourceSubmit();
 
+  const invalidateProjectSessionRequest = useCallback((projectId: number) => {
+    projectSessionRequestRef.current.set(
+      projectId,
+      (projectSessionRequestRef.current.get(projectId) ?? 0) + 1,
+    );
+    projectSessionBusyRef.current.delete(projectId);
+  }, []);
+
   useEffect(() => {
     return () => {
       projectsRequestRef.current += 1;
@@ -142,6 +152,9 @@ export function SessionList({
       if (!mountedRef.current || projectsRequestRef.current !== requestId) return;
       const items = response.data?.items ?? [];
       setProjects(items);
+      setExpandedProjectId((current) => (
+        current !== null && !items.some((project) => project.id === current) ? null : current
+      ));
       setProjectsPage(1);
       setProjectsTotal(response.data?.total ?? items.length);
     } catch (error) {
@@ -206,16 +219,35 @@ export function SessionList({
     try {
       const response = await listWorkProjectSessions(projectId, { page, size: RESOURCE_PAGE_SIZE });
       if (!mountedRef.current || projectSessionRequestRef.current.get(projectId) !== requestId) return;
-      const items = response.data?.items ?? [];
+      const items = validAgentSessionSummaries(response.data?.items);
       setProjectSessions((prev) => {
         const current = prev.get(projectId);
-        return new Map(prev).set(projectId, {
+        const currentItems = current?.items ?? [];
+        const incomingItems = page === 1
+          ? items
+          : mergeByKey(currentItems, items, (session) => session.session_id);
+        const nextItems = stabilizeByKey(
+          currentItems,
+          incomingItems,
+          (session) => session.session_id,
+          shallowEqual,
+        );
+        const next: ProjectSessionState = {
           loading: false,
           loadingMore: false,
-          items: page === 1 ? items : mergeByKey(current?.items ?? [], items, (session) => session.session_id),
+          items: nextItems,
           page,
-          total: response.data?.total ?? items.length,
-        });
+          total: response.data?.total
+            ?? (page === 1 ? nextItems.length : Math.max(current?.total ?? 0, nextItems.length)),
+        };
+        return current
+          && current.loading === next.loading
+          && current.loadingMore === next.loadingMore
+          && current.items === next.items
+          && current.page === next.page
+          && current.total === next.total
+          ? prev
+          : new Map(prev).set(projectId, next);
       });
       onSyncSessionSummaries(items);
     } catch (error) {
@@ -244,19 +276,26 @@ export function SessionList({
     void loadProjects();
   }, [loadProjects, projectListVersion]);
 
+  const expandedProjectPage = expandedProjectId === null
+    ? 0
+    : projectSessions.get(expandedProjectId)?.page ?? 0;
+
   useEffect(() => {
+    if (expandedProjectId === null || expandedProjectPage > 1) return;
     const timer = window.setInterval(() => {
-      if (expandedProjectId !== null && (projectSessions.get(expandedProjectId)?.page ?? 0) <= 1) {
+      if (document.visibilityState === "visible") {
         void loadProjectSessions(expandedProjectId, 1, true);
       }
     }, PROJECT_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [expandedProjectId, loadProjectSessions, projectSessions]);
+  }, [expandedProjectId, expandedProjectPage, loadProjectSessions]);
 
   const toggleProject = (projectId: number) => {
     const nextProjectId = expandedProjectId === projectId ? null : projectId;
     setExpandedProjectId(nextProjectId);
-    if (nextProjectId && !projectSessions.has(nextProjectId)) void loadProjectSessions(nextProjectId);
+    if (nextProjectId !== null && !projectSessions.has(nextProjectId)) {
+      void loadProjectSessions(nextProjectId);
+    }
   };
 
   const createProjectSession = async (project: WorkProjectSummary) => {
@@ -264,6 +303,7 @@ export function SessionList({
       const response = await createWorkProjectSession(project.id);
       const sessionId = response.data?.session_id;
       if (!sessionId) return response;
+      invalidateProjectSessionRequest(project.id);
       await loadProjectSessions(project.id);
       onSelect(sessionId);
       return response;
@@ -274,6 +314,16 @@ export function SessionList({
     await submit(async () => {
       const response = await deleteWorkProjectSession(projectId, sessionId);
       onDropRuntime(sessionId);
+      setProjectSessions((current) => {
+        const state = current.get(projectId);
+        if (!state?.items.some((session) => session.session_id === sessionId)) return current;
+        return new Map(current).set(projectId, {
+          ...state,
+          items: state.items.filter((session) => session.session_id !== sessionId),
+          total: Math.max(0, state.total - 1),
+        });
+      });
+      invalidateProjectSessionRequest(projectId);
       await loadProjectSessions(projectId);
       return response;
     });
@@ -291,7 +341,8 @@ export function SessionList({
       const response = await updateAgentSessionTitle(renameTarget.session.session_id, { title });
       setRenameTarget(null);
       setRenameTitle("");
-      if (renameTarget.projectId) {
+      if (renameTarget.projectId !== undefined) {
+        invalidateProjectSessionRequest(renameTarget.projectId);
         await loadProjectSessions(renameTarget.projectId, 1, true);
       } else {
         await onRefreshSessions();

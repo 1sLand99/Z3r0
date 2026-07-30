@@ -131,26 +131,32 @@ const STREAM_RENDER_INTERVAL_MS = 80;
 const MarkdownText = memo(function MarkdownText({ text, streaming }: { text: string; streaming: boolean }) {
   const [renderText, setRenderText] = useState(text);
   const latestTextRef = useRef(text);
+  const renderTimerRef = useRef<number | null>(null);
+  const lastRenderedAtRef = useRef(0);
 
   latestTextRef.current = text;
 
   useEffect(() => {
     if (!streaming) {
+      if (renderTimerRef.current !== null) {
+        window.clearTimeout(renderTimerRef.current);
+        renderTimerRef.current = null;
+      }
       setRenderText(text);
       return;
     }
-    const timer = setInterval(() => {
+    if (renderTimerRef.current !== null) return;
+    const elapsed = performance.now() - lastRenderedAtRef.current;
+    renderTimerRef.current = window.setTimeout(() => {
+      renderTimerRef.current = null;
+      lastRenderedAtRef.current = performance.now();
       setRenderText(latestTextRef.current);
-    }, STREAM_RENDER_INTERVAL_MS);
-    return () => {
-      clearInterval(timer);
-      setRenderText(latestTextRef.current);
-    };
-  }, [streaming, text === ""]);
-
-  useEffect(() => {
-    if (!streaming) setRenderText(text);
+    }, Math.max(0, STREAM_RENDER_INTERVAL_MS - elapsed));
   }, [streaming, text]);
+
+  useEffect(() => () => {
+    if (renderTimerRef.current !== null) window.clearTimeout(renderTimerRef.current);
+  }, []);
 
   const markdown = useMemo(
     () => normalizeMarkdownForRender(renderText, streaming),

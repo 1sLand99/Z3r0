@@ -4,7 +4,11 @@ import type { ChatNode, NestedTranscript, SubagentExecutionItem, TranscriptBlock
 export type SubagentTab = {
   agentCode: string;
   status: SubagentExecutionItem["status"];
-  runIds: string[];
+  runs: Array<{
+    runId: string;
+    status: SubagentExecutionItem["status"];
+    order: number;
+  }>;
 };
 
 export type SubagentSelection = string;
@@ -20,19 +24,50 @@ export type SubagentTarget = {
 };
 
 export function collectSubagentTabs(nodes: ChatNode[]): SubagentTab[] {
-  const tabs = new Map<string, { status: SubagentExecutionItem["status"]; runIds: Set<string> }>();
+  const tabs = new Map<string, Map<string, SubagentTab["runs"][number]>>();
+  let order = 0;
   for (const { task } of subagentRuns(nodes)) {
-    const current = tabs.get(task.agentCode);
-    tabs.set(task.agentCode, {
-      status: mergeSubagentStatus(current?.status, task.status),
-      runIds: new Set([...(current?.runIds ?? []), task.runId]),
-    });
+    order += 1;
+    let runs = tabs.get(task.agentCode);
+    if (!runs) {
+      runs = new Map();
+      tabs.set(task.agentCode, runs);
+    }
+    runs.set(task.runId, { runId: task.runId, status: task.status, order });
   }
-  return Array.from(tabs, ([agentCode, tab]) => ({
-    agentCode,
-    status: tab.status,
-    runIds: Array.from(tab.runIds),
-  }));
+  return Array.from(tabs, ([agentCode, runMap]) => {
+    const runs = Array.from(runMap.values());
+    const latest = runs.reduce((current, run) => run.order > current.order ? run : current);
+    return {
+      agentCode,
+      status: runs.some((run) => isSubagentRunning(run.status))
+        ? AGENT_SUBORDINATE_STATUS.RUNNING
+        : latest.status,
+      runs,
+    };
+  });
+}
+
+export function latestRunningSubagentTab(tabs: SubagentTab[]): SubagentTab | null {
+  let latest: { tab: SubagentTab; order: number } | null = null;
+  for (const tab of tabs) {
+    for (const run of tab.runs) {
+      if (!isSubagentRunning(run.status) || (latest && latest.order >= run.order)) continue;
+      latest = { tab, order: run.order };
+    }
+  }
+  return latest?.tab ?? null;
+}
+
+export function latestSubagentTab(tabs: SubagentTab[]): SubagentTab | null {
+  let latest: { tab: SubagentTab; order: number } | null = null;
+  for (const tab of tabs) {
+    for (const run of tab.runs) {
+      if (latest && latest.order >= run.order) continue;
+      latest = { tab, order: run.order };
+    }
+  }
+  return latest?.tab ?? null;
 }
 
 export function findSubagentTarget(nodes: ChatNode[], selection: SubagentSelection): SubagentTarget | null {
@@ -71,14 +106,6 @@ export function isSubagentFailed(status: SubagentExecutionItem["status"] | undef
   return status === AGENT_SUBORDINATE_STATUS.FAILED || status === AGENT_SUBORDINATE_STATUS.CANCELED;
 }
 
-function mergeSubagentStatus(
-  current: SubagentExecutionItem["status"] | undefined,
-  next: SubagentExecutionItem["status"],
-): SubagentExecutionItem["status"] {
-  if (isSubagentRunning(current) || isSubagentRunning(next)) return AGENT_SUBORDINATE_STATUS.RUNNING;
-  return next;
-}
-
 function* subagentRuns(nodes: ChatNode[], reverse = false): Generator<SubagentRunTarget> {
   const start = reverse ? nodes.length - 1 : 0;
   const end = reverse ? -1 : nodes.length;
@@ -98,13 +125,20 @@ function* subagentRunsFromBlocks(blocks: TranscriptBlock[], reverse: boolean): G
 
   for (let i = start; i !== end; i += step) {
     const block = blocks[i];
+    if (reverse && block.kind === "tool" && block.nested) {
+      yield* subagentRunsFromBlocks(block.nested.blocks, true);
+    }
     const task = subagentTask(block);
-    if (!task?.agentCode || !task.runId) continue;
-    yield {
-      task,
-      transcript: block.kind === "tool" ? block.nested : undefined,
-      live: isSubagentRunning(task.status),
-    };
+    if (task?.agentCode && task.runId) {
+      yield {
+        task,
+        transcript: block.kind === "tool" ? block.nested : undefined,
+        live: isSubagentRunning(task.status),
+      };
+    }
+    if (!reverse && block.kind === "tool" && block.nested) {
+      yield* subagentRunsFromBlocks(block.nested.blocks, false);
+    }
   }
 }
 

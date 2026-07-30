@@ -53,9 +53,16 @@ export function listAgentTimeline(
 export const updateAgentSessionTitle = defineJsonEndpoint<
   [sessionId: string, payload: UpdateAgentSessionTitleRequest], UpdateAgentSessionTitleResponse
 >("PATCH", (sessionId) => `${AGENT_SESSIONS_PATH}/${encodeURIComponent(sessionId)}/title`, (_, payload) => payload);
-export const updateAgentSessionSandboxContainer = defineJsonEndpoint<
-  [sessionId: string, payload: UpdateAgentSessionSandboxContainerRequest], UpdateAgentSessionSandboxContainerResponse
->("PATCH", (sessionId) => `${AGENT_SESSIONS_PATH}/${encodeURIComponent(sessionId)}/sandbox-container`, (_, payload) => payload);
+export function updateAgentSessionSandboxContainer(
+  sessionId: string,
+  payload: UpdateAgentSessionSandboxContainerRequest,
+  signal?: AbortSignal,
+) {
+  return apiRequest<UpdateAgentSessionSandboxContainerResponse>(
+    `${AGENT_SESSIONS_PATH}/${encodeURIComponent(sessionId)}/sandbox-container`,
+    { method: "PATCH", body: payload, signal },
+  );
+}
 export const deleteAgentSession = defineJsonEndpoint<[sessionId: string], DeleteAgentSessionResponse>(
   "DELETE", (sessionId) => `${AGENT_SESSIONS_PATH}/${encodeURIComponent(sessionId)}`,
 );

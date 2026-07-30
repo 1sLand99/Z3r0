@@ -1,6 +1,6 @@
 import { Button } from "@douyinfe/semi-ui";
 import { GitBranch, X } from "lucide-react";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { AgentInfo } from "../../shared/api/types";
 import { cx } from "../../shared/lib/className";
 import type { ChatNode, SubagentExecutionItem } from "./chatState";
@@ -16,7 +16,7 @@ import { MessageScrollPanel } from "./MessageScrollPanel";
 import { TranscriptContent } from "./Transcript";
 import { ExecutionSection, SubagentStatusTag } from "./TranscriptExecutions";
 
-export function SubagentSidePanel({
+export const SubagentSidePanel = memo(function SubagentSidePanel({
   nodes,
   tabs,
   agents,
@@ -92,7 +92,14 @@ export function SubagentSidePanel({
       </div>
     </aside>
   );
-}
+}, (previous, next) => (
+  previous.tabs === next.tabs
+  && previous.agents === next.agents
+  && previous.selection === next.selection
+  && previous.onSelect === next.onSelect
+  && previous.onClose === next.onClose
+  && (next.selection === null || previous.nodes === next.nodes)
+));
 
 function SubagentTargetView({ target }: { target: SubagentTarget }) {
   return (

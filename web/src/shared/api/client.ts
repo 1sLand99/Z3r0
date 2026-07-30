@@ -7,6 +7,7 @@ type RequestOptions = {
   body?: unknown;
   auth?: boolean;
   signal?: AbortSignal;
+  timeoutMs?: number;
 };
 
 type JsonRequestMethod = NonNullable<RequestOptions["method"]>;
@@ -18,6 +19,10 @@ type RawRequestOptions = {
   auth?: boolean;
   signal?: AbortSignal;
 };
+
+const QUERY_TIMEOUT_MS = 30_000;
+const MUTATION_TIMEOUT_MS = 120_000;
+const DOWNLOAD_TIMEOUT_MS = 120_000;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -65,25 +70,30 @@ export async function apiRequest<ResponsePayload>(path: string, options: Request
 
   addAccessTokenHeader(headers, options.auth);
 
-  let response: Response;
+  const requestAbort = createRequestAbort(
+    options.signal,
+    options.timeoutMs ?? (options.method && options.method !== "GET" ? MUTATION_TIMEOUT_MS : QUERY_TIMEOUT_MS),
+  );
   try {
-    response = await fetch(path, {
+    const response = await fetch(path, {
       method: options.method || "GET",
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
+      signal: requestAbort.signal,
     });
+    const parsed = await parseJsonResponse(response);
+    parseCommonResponseError(response, parsed);
+    return parsed as ResponsePayload;
   } catch (error) {
+    if (error instanceof ApiError) throw error;
     if (isAbortError(error)) throw error;
     throw new ApiError(0, {
       code: 0,
       message: error instanceof Error ? error.message : "Network request failed",
     });
+  } finally {
+    requestAbort.dispose();
   }
-
-  const parsed = await parseJsonResponse(response);
-  parseCommonResponseError(response, parsed);
-  return parsed as ResponsePayload;
 }
 
 export function defineJsonEndpoint<Args extends unknown[], ResponsePayload>(
@@ -120,28 +130,39 @@ async function rawApiRequest(path: string, options: RawRequestOptions = {}) {
 }
 
 export async function apiForm<ResponsePayload>(path: string, body: FormData, auth = true) {
-  const response = await rawApiRequest(path, {
-    method: "POST",
-    headers: { Accept: "application/json" },
-    body,
-    auth,
-  });
-  const parsed = await parseJsonResponse(response);
-  parseCommonResponseError(response, parsed);
-  return parsed as ResponsePayload;
+  const requestAbort = createRequestAbort(undefined, MUTATION_TIMEOUT_MS);
+  try {
+    const response = await rawApiRequest(path, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body,
+      auth,
+      signal: requestAbort.signal,
+    });
+    const parsed = await parseJsonResponse(response);
+    parseCommonResponseError(response, parsed);
+    return parsed as ResponsePayload;
+  } finally {
+    requestAbort.dispose();
+  }
 }
 
 export async function apiBlob(path: string, auth = true) {
-  const response = await rawApiRequest(path, { auth });
-  if (!response.ok) {
-    const parsed = await parseJsonResponse(response);
-    parseCommonResponseError(response, parsed);
-    throw new ApiError(response.status);
+  const requestAbort = createRequestAbort(undefined, DOWNLOAD_TIMEOUT_MS);
+  try {
+    const response = await rawApiRequest(path, { auth, signal: requestAbort.signal });
+    if (!response.ok) {
+      const parsed = await parseJsonResponse(response);
+      parseCommonResponseError(response, parsed);
+      throw new ApiError(response.status);
+    }
+    return {
+      blob: await response.blob(),
+      filename: parseContentDispositionFilename(response.headers.get("content-disposition")),
+    };
+  } finally {
+    requestAbort.dispose();
   }
-  return {
-    blob: await response.blob(),
-    filename: parseContentDispositionFilename(response.headers.get("content-disposition")),
-  };
 }
 
 function handleAuthExpired(status: number, payloadCode: number) {
@@ -157,7 +178,50 @@ export function buildAuthenticatedWebSocketUrl(path: string, token = getStoredAc
 }
 
 export function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
+  return (error instanceof DOMException && error.name === "AbortError")
+    || (typeof error === "object" && error !== null && Reflect.get(error, "name") === "AbortError");
+}
+
+export function composeAbortSignals(signals: readonly (AbortSignal | undefined)[]): {
+  signal: AbortSignal;
+  dispose: () => void;
+} {
+  const controller = new AbortController();
+  const removers: Array<() => void> = [];
+  const abortFrom = (signal: AbortSignal) => {
+    if (!controller.signal.aborted) controller.abort(signal.reason);
+  };
+  for (const signal of signals) {
+    if (!signal) continue;
+    if (signal.aborted) {
+      abortFrom(signal);
+      break;
+    }
+    const onAbort = () => abortFrom(signal);
+    signal.addEventListener("abort", onAbort, { once: true });
+    removers.push(() => signal.removeEventListener("abort", onAbort));
+  }
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      for (const remove of removers) remove();
+    },
+  };
+}
+
+function createRequestAbort(signal: AbortSignal | undefined, timeoutMs: number) {
+  const timeoutController = new AbortController();
+  const timer = window.setTimeout(() => {
+    timeoutController.abort(new DOMException(`Request timed out after ${timeoutMs} ms`, "TimeoutError"));
+  }, timeoutMs);
+  const composed = composeAbortSignals([signal, timeoutController.signal]);
+  return {
+    signal: composed.signal,
+    dispose: () => {
+      window.clearTimeout(timer);
+      composed.dispose();
+    },
+  };
 }
 
 function addAccessTokenHeader(headers: Headers, auth = true) {
@@ -171,7 +235,13 @@ function addAccessTokenHeader(headers: Headers, auth = true) {
 function parseContentDispositionFilename(header: string | null) {
   if (!header) return "download";
   const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header);
-  if (encoded?.[1]) return decodeURIComponent(encoded[1]);
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1]);
+    } catch {
+      return encoded[1];
+    }
+  }
   const quoted = /filename="([^"]+)"/i.exec(header);
   if (quoted?.[1]) return quoted[1];
   return "download";

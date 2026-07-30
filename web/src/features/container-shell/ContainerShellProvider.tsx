@@ -145,6 +145,7 @@ type FitTerminalOptions = {
 };
 
 const SHELL_OUTPUT_DECODER = new TextDecoder();
+const SHELL_CONNECT_TIMEOUT_MS = 12_000;
 
 function shellFlightMeta(state: ShellWindowState) {
   return state.status;
@@ -451,16 +452,30 @@ export function ContainerShellProvider({ children }: { children: ReactNode }) {
     let fit: FitAddon | null = null;
     let socket: WebSocket | null = null;
     let disposable: { dispose: () => void } | null = null;
+    let connectTimer: number | null = null;
+
+    const clearConnectTimer = () => {
+      if (connectTimer === null) return;
+      window.clearTimeout(connectTimer);
+      connectTimer = null;
+    };
 
     const updateShellStatus = (status: ShellStatus) => {
-      setShell((current) => (
-        current?.connectionKey === activeConnectionKey && current.shellUrl === activeShellUrl
-          ? { ...current, status }
-          : current
-      ));
+      setShell((current) => {
+        if (
+          current?.connectionKey !== activeConnectionKey
+          || current.shellUrl !== activeShellUrl
+          || current.status === status
+        ) return current;
+        return { ...current, status };
+      });
     };
-    const onSocketTerminated = () => updateShellStatus("closed");
+    const onSocketTerminated = () => {
+      clearConnectTimer();
+      updateShellStatus("closed");
+    };
     const onSocketOpen = () => {
+      clearConnectTimer();
       updateShellStatus("open");
       terminal?.focus();
       fitTerminal({ snapHeight: false });
@@ -474,18 +489,23 @@ export function ContainerShellProvider({ children }: { children: ReactNode }) {
       terminal.write(SHELL_OUTPUT_DECODER.decode(event.data as ArrayBuffer));
     };
     const cleanup = () => {
+      clearConnectTimer();
       disposable?.dispose();
       if (socket) {
         socket.removeEventListener("open", onSocketOpen);
         socket.removeEventListener("message", onSocketMessage);
         socket.removeEventListener("close", onSocketTerminated);
         socket.removeEventListener("error", onSocketTerminated);
-        socket.close();
+        if (socketRef.current === socket) {
+          socket.close();
+          socketRef.current = null;
+        }
       }
-      terminal?.dispose();
-      if (socketRef.current === socket) socketRef.current = null;
-      if (terminalRef.current === terminal) terminalRef.current = null;
-      if (fitRef.current === fit) fitRef.current = null;
+      if (terminalRef.current === terminal) {
+        terminal?.dispose();
+        terminalRef.current = null;
+        if (fitRef.current === fit) fitRef.current = null;
+      }
       disposable = null;
       socket = null;
       terminal = null;
@@ -537,6 +557,11 @@ export function ContainerShellProvider({ children }: { children: ReactNode }) {
         socket.addEventListener("message", onSocketMessage);
         socket.addEventListener("close", onSocketTerminated);
         socket.addEventListener("error", onSocketTerminated);
+        connectTimer = window.setTimeout(() => {
+          if (socket?.readyState !== WebSocket.CONNECTING) return;
+          socket.close();
+          updateShellStatus("closed");
+        }, SHELL_CONNECT_TIMEOUT_MS);
       })
       .catch((error) => {
         if (canceled) return;

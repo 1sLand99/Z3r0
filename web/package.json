@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --config vite.app.config.ts --host 0.0.0.0",
     "generate:api": "openapi-typescript ./openapi.json -o ./src/shared/api/generated/schema.ts",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "npm run generate:api && tsc --noEmit && vite build --config vite.app.config.ts",
     "build:landing": "tsc --noEmit && vite build --config vite.landing.config.ts",
@@ -42,6 +43,7 @@
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.1",
+    "react-virtuoso": "^4.18.11",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1"
   },
@@ -49,6 +51,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "openapi-typescript": "^7.13.0",
     "typescript": "^5.9.3",
-    "vite": "^8.1.4"
+    "vite": "^8.1.4",
+    "vitest": "^4.1.10"
   }
 }

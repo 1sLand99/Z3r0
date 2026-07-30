@@ -76,12 +76,13 @@ export function FileViewer({ containerId, file, onClose }: Props) {
   const load = useCallback(async () => {
     const requestId = loadRequestIdRef.current + 1;
     loadRequestIdRef.current = requestId;
-    setLoading(true);
+    setLoading(viewerType !== "binary");
     setError(null);
     setSaving(false);
     setContent("");
     setEditContent("");
     setEditing(false);
+    if (viewerType === "binary") return;
     try {
       const params: { path: string; base64?: boolean } = { path: file.path };
       if (viewerType === "image") params.base64 = true;

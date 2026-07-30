@@ -86,7 +86,7 @@ export type ChatNode =
       displayText: string;
       targetAgentCode: string;
     }
-  | ({ kind: "agent"; id: string } & AgentTranscript);
+  | ({ kind: "agent"; id: string; targetAgentCode: string } & AgentTranscript);
 
 export type ChatState = {
   nodes: ChatNode[];

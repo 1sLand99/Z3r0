@@ -19,6 +19,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import "../../app/styles/playground.css";
 import { useAdminHeaderActions } from "../../app/layouts/AdminLayout";
 import { showApiError, showApiSuccess } from "../../shared/api/feedback";
+import { isAbortError } from "../../shared/api/client";
 import { SANDBOX_CONTAINER_STATUS, SESSION_TYPE } from "../../shared/api/generated/constants";
 import {
   canManageSandboxContainer,
@@ -38,16 +39,39 @@ import { UI_TEXT } from "../../shared/lib/uiText";
 import { useContainerShell } from "../container-shell/ContainerShellProvider";
 import { WorkProjectInfoModal } from "../work-projects/WorkProjectInfoModal";
 import { SandboxContainerFormModal } from "../sandbox-containers/SandboxContainerFormModal";
-import { useAgentSessionContext, type AgentSessionConnectionStatus } from "./AgentSessionProvider";
+import {
+  useActiveAgentCode,
+  useActiveSessionRuntime,
+  useActiveSessionRuntimeSelector,
+  useAgentCatalog,
+  useAgentSessionCommands,
+  useAgentSessionDirectory,
+  type AgentSessionConnectionStatus,
+} from "./AgentSessionProvider";
 import { ChatStream } from "./ChatStream";
 import { Composer } from "./Composer";
-import { MessageScrollPanel } from "./MessageScrollPanel";
 import { SandboxSelector } from "./SandboxSelector";
 import { SubagentSidePanel } from "./SubagentSidePanel";
 import { useSubagentPanel } from "./useSubagentPanel";
-import { isSubagentRunning } from "./subagentView";
+import {
+  isSubagentRunning,
+  latestRunningSubagentTab,
+  latestSubagentTab,
+} from "./subagentView";
 
 type PlaygroundLocationState = { sessionId?: string };
+
+type SubagentControls = {
+  count: number;
+  hasRunning: boolean;
+  openLatest: () => void;
+};
+
+const EMPTY_SUBAGENT_CONTROLS: SubagentControls = {
+  count: 0,
+  hasRunning: false,
+  openLatest: () => undefined,
+};
 
 type SandboxActionButtonProps = {
   ariaLabel: string;
@@ -70,10 +94,13 @@ export function PlaygroundPage() {
   const {
     activeSessionId, activeSessionSummary, selectSession,
     refreshSessions,
-    chatState, status, historyLoading, historyHasMore, historyPrepending, historyVersion,
-    agents, defaultAgentCode, activeAgentCode, setActiveAgentCode,
-    send, updateSelectedSandboxContainer, interrupt, cancelAll, loadPreviousHistory,
-  } = useAgentSessionContext();
+  } = useAgentSessionDirectory();
+  const { agents } = useAgentCatalog();
+  const {
+    setActiveAgentCode, send, updateSelectedSandboxContainer, interrupt, cancelAll, loadPreviousHistory,
+    retryInitialHistory,
+  } = useAgentSessionCommands();
+  const activeAgentCode = useActiveAgentCode();
   const location = useLocation();
   const navigate = useNavigate();
   const [sandboxContainerId, setSandboxContainerId] = useState<number | null>(null);
@@ -83,13 +110,11 @@ export function PlaygroundPage() {
   const [projectRecordsOpen, setProjectRecordsOpen] = useState(false);
   const [createSandboxOpen, setCreateSandboxOpen] = useState(false);
   const [sandboxAction, setSandboxAction] = useState<string | null>(null);
+  const [subagentControls, setSubagentControls] = useState<SubagentControls>(EMPTY_SUBAGENT_CONTROLS);
   const activeSessionIdRef = useRef(activeSessionId);
   const sandboxOperationRef = useRef({ busy: false, generation: 0 });
   activeSessionIdRef.current = activeSessionId;
   const { openFileManager, openNoVNC, openShell, syncContainerWindows } = useContainerShell();
-  const { selectedSubagent, setSelectedSubagent, subagentTabs, closeSubagentPanel } = useSubagentPanel(chatState, activeSessionId);
-  const hasRunningSubagents = subagentTabs.some((tab) => isSubagentRunning(tab.status));
-  const agentSwitchDisabled = activeAgentCode === defaultAgentCode && hasRunningSubagents;
   const sandboxOperationBusy = sandboxAction !== null;
 
   const activeProjectId = activeSessionSummary?.session_type === SESSION_TYPE.PROJECT ? activeSessionSummary.project_id ?? null : null;
@@ -141,9 +166,17 @@ export function PlaygroundPage() {
     setProjectRecordsOpen(true);
   }, []);
   const openSubagentPanel = useCallback(() => {
-    const tab = [...subagentTabs].reverse().find((item) => isSubagentRunning(item.status)) ?? subagentTabs[subagentTabs.length - 1];
-    if (tab) setSelectedSubagent(tab.agentCode);
-  }, [setSelectedSubagent, subagentTabs]);
+    subagentControls.openLatest();
+  }, [subagentControls]);
+  const handleSubagentControls = useCallback((next: SubagentControls) => {
+    setSubagentControls((current) => (
+      current.count === next.count
+      && current.hasRunning === next.hasRunning
+      && current.openLatest === next.openLatest
+        ? current
+        : next
+    ));
+  }, []);
 
   const openSelectedFileManager = useCallback(() => {
     if (selectedSandboxContainer) openFileManager(selectedSandboxContainer);
@@ -236,7 +269,9 @@ export function PlaygroundPage() {
       setSandboxContainerId(selectedId);
       syncContainerWindows(findSandboxContainerById(selectableSandboxContainers, selectedId));
     } catch (error) {
-      if (isCurrentSandboxOperation(sandboxOperationRef, activeSessionIdRef, operation)) showApiError(error);
+      if (!isAbortError(error) && isCurrentSandboxOperation(sandboxOperationRef, activeSessionIdRef, operation)) {
+        showApiError(error);
+      }
     } finally {
       finishSandboxOperation(sandboxOperationRef, operation, setSandboxAction);
     }
@@ -413,19 +448,16 @@ export function PlaygroundPage() {
         ) : null}
         <SandboxActionButton
           ariaLabel="Open subagent panel"
-          disabled={subagentTabs.length === 0}
+          disabled={subagentControls.count === 0}
           icon={<PanelRightOpen size={15} />}
-          tooltip={subagentTabs.length > 0 ? "Open subagent panel" : "No subagent messages"}
+          tooltip={subagentControls.count > 0 ? "Open subagent panel" : "No subagent messages"}
           onClick={openSubagentPanel}
         />
       </div>
       <Button icon={<Plus size={16} />} theme="solid" type="primary" onClick={() => selectSession(null)}>
         New chat
       </Button>
-      <span className={cx("stream-status", `stream-status-${status}`)}>
-        <Activity size={14} />
-        <span>{STATUS_LABEL[status]}</span>
-      </span>
+      <ConnectionStatus />
     </>
   ), [
     activeProjectId,
@@ -453,8 +485,7 @@ export function PlaygroundPage() {
     selectedSandboxContainer,
     selectedSandboxName,
     shellUnavailableReason,
-    status,
-    subagentTabs.length,
+    subagentControls.count,
   ]);
 
   useLayoutEffect(() => {
@@ -462,68 +493,21 @@ export function PlaygroundPage() {
     return () => setHeaderActions(null);
   }, [headerNode, setHeaderActions]);
 
-  const handleSend = async (content: AgentInputPart[]) => {
-    try {
-      await send(content, activeSessionId, sandboxContainerId);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   return (
-    <div className={cx("playground-shell", selectedSubagent && "playground-shell-split")}>
-      <div className="playground-main">
-        <div className="playground-conversation-frame">
-          <div className="playground-main-column">
-            <MessageScrollPanel
-              ariaLabel="Conversation messages"
-              className="playground-canvas-shell"
-              contentClassName="playground-canvas"
-              loading={historyLoading}
-              loadingPrevious={historyPrepending}
-              onLoadPrevious={historyHasMore && !historyPrepending ? () => void loadPreviousHistory() : undefined}
-              preserveScrollKey={historyVersion}
-              resetKey={activeSessionId ?? "new-chat"}
-              scrollButtonClassName="chat-scroll-tail-floating"
-              watch={[chatState.nodes, chatState.streaming]}
-            >
-              {(tailRef) => (
-                <ChatStream
-                  nodes={chatState.nodes}
-                  streaming={chatState.streaming}
-                  agents={agents}
-                  selectedSubagent={selectedSubagent}
-                  tailRef={tailRef}
-                  onOpenSubagent={setSelectedSubagent}
-                />
-              )}
-            </MessageScrollPanel>
-            <div className="playground-composer">
-              <Composer
-                streaming={chatState.streaming}
-                disabled={historyLoading}
-                agents={agents}
-                activeAgentCode={activeAgentCode}
-                agentSwitchDisabled={agentSwitchDisabled}
-                canCancelAll={hasRunningSubagents}
-                onPickAgent={setActiveAgentCode}
-                onSend={handleSend}
-                onInterrupt={() => void interrupt()}
-                onCancelAll={() => void cancelAll()}
-              />
-            </div>
-          </div>
-          <SubagentSidePanel
-            nodes={chatState.nodes}
-            tabs={subagentTabs}
-            agents={agents}
-            selection={selectedSubagent}
-            onSelect={setSelectedSubagent}
-            onClose={closeSubagentPanel}
-          />
-        </div>
-      </div>
+    <>
+      <PlaygroundConversation
+        activeSessionId={activeSessionId}
+        activeAgentCode={activeAgentCode}
+        sandboxContainerId={sandboxContainerId}
+        agents={agents}
+        setActiveAgentCode={setActiveAgentCode}
+        send={send}
+        interrupt={interrupt}
+        cancelAll={cancelAll}
+        loadPreviousHistory={loadPreviousHistory}
+        retryInitialHistory={retryInitialHistory}
+        onSubagentControls={handleSubagentControls}
+      />
       <WorkProjectInfoModal
         open={projectRecordsOpen && Boolean(activeProjectId)}
         projectId={activeProjectId}
@@ -534,7 +518,137 @@ export function PlaygroundPage() {
         onCancel={() => setCreateSandboxOpen(false)}
         onCreated={handleSandboxCreated}
       />
-    </div>
+    </>
+  );
+}
+
+const selectConnectionStatus = (runtime: ReturnType<typeof useActiveSessionRuntime>) => runtime.status;
+
+function ConnectionStatus() {
+  const status = useActiveSessionRuntimeSelector(selectConnectionStatus);
+  return (
+    <span className={cx("stream-status", `stream-status-${status}`)}>
+      <Activity size={14} />
+      <span>{STATUS_LABEL[status]}</span>
+    </span>
+  );
+}
+
+function PlaygroundConversation({
+  activeSessionId,
+  activeAgentCode,
+  sandboxContainerId,
+  agents,
+  setActiveAgentCode,
+  send,
+  interrupt,
+  cancelAll,
+  loadPreviousHistory,
+  retryInitialHistory,
+  onSubagentControls,
+}: {
+  activeSessionId: string | null;
+  activeAgentCode: string;
+  sandboxContainerId: number | null;
+  agents: ReturnType<typeof useAgentCatalog>["agents"];
+  setActiveAgentCode: (code: string) => void;
+  send: (content: AgentInputPart[], sessionId: string | null, sandboxContainerId: number | null) => Promise<void>;
+  interrupt: (sessionId?: string | null) => Promise<void>;
+  cancelAll: (sessionId?: string | null) => Promise<void>;
+  loadPreviousHistory: (sessionId?: string | null) => Promise<void>;
+  retryInitialHistory: (sessionId?: string | null) => void;
+  onSubagentControls: (controls: SubagentControls) => void;
+}) {
+  const runtime = useActiveSessionRuntime();
+  const { defaultAgentCode } = useAgentCatalog();
+  const chatState = runtime.timeline.state;
+  const {
+    selectedSubagent,
+    setSelectedSubagent,
+    subagentTabs,
+    closeSubagentPanel,
+  } = useSubagentPanel(chatState, activeSessionId, runtime.timeline.subagentVersion);
+  const tabsRef = useRef(subagentTabs);
+  tabsRef.current = subagentTabs;
+  const hasRunningSubagents = subagentTabs.some((tab) => isSubagentRunning(tab.status));
+  const openLatestSubagent = useCallback(() => {
+    const tabs = tabsRef.current;
+    const tab = latestRunningSubagentTab(tabs) ?? latestSubagentTab(tabs);
+    if (tab) setSelectedSubagent(tab.agentCode);
+  }, [setSelectedSubagent]);
+
+  useEffect(() => {
+    onSubagentControls({
+      count: subagentTabs.length,
+      hasRunning: hasRunningSubagents,
+      openLatest: openLatestSubagent,
+    });
+  }, [hasRunningSubagents, onSubagentControls, openLatestSubagent, subagentTabs.length]);
+  useEffect(() => () => onSubagentControls(EMPTY_SUBAGENT_CONTROLS), [onSubagentControls]);
+
+  const handleSend = useCallback(async (content: AgentInputPart[]) => {
+    try {
+      await send(content, activeSessionId, sandboxContainerId);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [activeSessionId, sandboxContainerId, send]);
+  const handleInterrupt = useCallback(() => { void interrupt(); }, [interrupt]);
+  const handleCancelAll = useCallback(() => { void cancelAll(); }, [cancelAll]);
+  const handleLoadPrevious = useCallback(() => {
+    void loadPreviousHistory(activeSessionId);
+  }, [activeSessionId, loadPreviousHistory]);
+  const handleRetryHistory = useCallback(() => {
+    retryInitialHistory(activeSessionId);
+  }, [activeSessionId, retryInitialHistory]);
+  const agentSwitchDisabled = activeAgentCode === defaultAgentCode && hasRunningSubagents;
+
+  return (
+    <section className={cx("playground-workspace", selectedSubagent && "playground-workspace-subagent-open")}>
+      <div className="playground-conversation">
+        <ChatStream
+          key={activeSessionId ?? "new-chat"}
+          nodes={chatState.nodes}
+          streaming={chatState.streaming}
+          loading={runtime.history.loadingInitial}
+          loadingPrevious={runtime.history.loadingPrevious}
+          historyError={runtime.history.initialError}
+          hasPrevious={runtime.history.hasMoreBefore}
+          firstItemIndex={runtime.history.firstItemIndex}
+          agents={agents}
+          selectedSubagent={selectedSubagent}
+          onLoadPrevious={handleLoadPrevious}
+          onRetryHistory={handleRetryHistory}
+          onOpenSubagent={setSelectedSubagent}
+        />
+        <div className="playground-composer">
+          <Composer
+            key={activeSessionId ?? "new-chat"}
+            streaming={chatState.streaming}
+            disabled={Boolean(activeSessionId) && !runtime.history.initialLoaded}
+            agents={agents}
+            activeAgentCode={activeAgentCode}
+            agentSwitchDisabled={agentSwitchDisabled}
+            canCancelAll={hasRunningSubagents}
+            onPickAgent={setActiveAgentCode}
+            onSend={handleSend}
+            onInterrupt={handleInterrupt}
+            onCancelAll={handleCancelAll}
+          />
+        </div>
+      </div>
+      {selectedSubagent ? (
+        <SubagentSidePanel
+          nodes={chatState.nodes}
+          tabs={subagentTabs}
+          agents={agents}
+          selection={selectedSubagent}
+          onSelect={setSelectedSubagent}
+          onClose={closeSubagentPanel}
+        />
+      ) : null}
+    </section>
   );
 }
 

@@ -118,16 +118,12 @@
   flex-direction: column;
   width: 100%;
   min-width: 0;
-  padding: 16px 16px 170px;
-}
-
-.subagent-side-body-shell .message-scroll-viewport {
-  scroll-padding-bottom: 170px;
+  padding: 16px;
 }
 
 .subagent-scroll-tail-floating {
   right: 16px;
-  bottom: 142px;
+  bottom: 16px;
 }
 
 .subagent-task-view,
