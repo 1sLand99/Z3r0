@@ -42,9 +42,9 @@ const egressModes = [
 ];
 
 const operationSignals = [
-  { label: "Recon", detail: "Correlate the authorized surface", code: "MAP", icon: Network },
+  { label: "Surface review", detail: "Correlate the authorized surface", code: "MAP", icon: Network },
   { label: "Code audit", detail: "Trace data and trust boundaries", code: "TRACE", icon: Code2 },
-  { label: "Validation", detail: "Confirm impact in isolation", code: "PROVE", icon: ShieldCheck },
+  { label: "Validation", detail: "Confirm bounded impact in isolation", code: "PROVE", icon: ShieldCheck },
 ];
 
 type LandingPrimaryAction = {
@@ -93,7 +93,7 @@ const planes: CardItem[] = [
   {
     title: "Evidence Plane",
     kicker: "WorkProject",
-    text: "Connects authorized scope, asset relationships, WorkItem-attributed evidence, findings, attack paths, and review gates in one durable operating record.",
+    text: "Connects authorized scope, asset relationships, WorkItem-attributed evidence, findings, assessment paths, and review gates in one durable operating record.",
     icon: FileCheck2,
     items: ["Asset graph", "Evidence chain", "Workflow and paths"],
   },
@@ -140,12 +140,12 @@ const evidenceNodes: CardItem[] = [
   { title: "Graph-targeted work", text: "Coordinated assignments connect specialists, graph assets, test surfaces, and review outcomes", icon: ClipboardCheck },
   { title: "Evidence", text: "Immutable observations remain attributed to the WorkItem and reproducible source", icon: FileCheck2 },
   { title: "Security conclusions", text: "Findings separate validation state, impact, and disposition", icon: FileSearch },
-  { title: "Attack paths", text: "Evidence-backed steps reconstruct access and impact", icon: Route },
+  { title: "Assessment paths", text: "Evidence-backed steps document exposure and impact boundaries", icon: Route },
 ];
 
 const workbenchSurfaces: CardItem[] = [
   { title: "Playground", text: "Live transcript, Agent selection, streaming state, subagent panel, and sandbox actions.", icon: Activity },
-  { title: "Work Projects", text: "Searchable scope coverage, graph-targeted workflow, evidence chains, findings, attack paths, retest candidates, and decision activity.", icon: FolderKanban },
+  { title: "Work Projects", text: "Searchable scope coverage, graph-targeted workflow, evidence chains, findings, assessment paths, retest candidates, and decision activity.", icon: FolderKanban },
   { title: "Knowledges", text: "Parallel document ingestion, vector inspection, semantic retrieval, and progressive knowledge graph exploration.", icon: Database },
   { title: "Host Management", text: "Docker host inventory for distributing sandbox workloads across managed infrastructure.", icon: Server },
   { title: "Egress Proxies", text: "Managed HTTP, HTTPS, and SOCKS5 upstreams for container-level outbound routing.", icon: Network },
@@ -173,10 +173,10 @@ const sandboxToolchain: CardItem[] = [
     items: ["file / sha256sum", "7z / unzip / tar", "archive-file-triage", "readelf"],
   },
   {
-    title: "Reverse and pwn",
-    text: "ELF triage, debugger state, runtime traces, exploit prototyping, and mitigation review.",
+    title: "Binary diagnostics",
+    text: "ELF triage, debugger state, runtime traces, controlled interaction, and mitigation review.",
     icon: Code2,
-    items: ["gdb + Pwndbg", "strace / ltrace", "pwntools", "checksec from pwntools"],
+    items: ["gdb debugger", "strace / ltrace", "binary interaction helpers", "checksec"],
   },
   {
     title: "Mobile and firmware",
@@ -196,7 +196,7 @@ const agents: AgentItem[] = [
   { code: "cso", name: "Z3r0", role: "Chief Security Lead", detail: "Task decomposition, team coordination, result integration.", icon: Workflow },
   { code: "cae", name: "V3ra", role: "Code Audit Engineer", detail: "Source code auditing, dependency review, remediation verification.", icon: ClipboardCheck },
   { code: "cie", name: "L1ly", role: "Intelligence Gathering Engineer", detail: "Intelligence gathering, asset discovery, relationship mapping.", icon: FileSearch },
-  { code: "cpe", name: "Fr4nk", role: "Penetration Testing Engineer", detail: "Penetration testing, vulnerability validation, impact confirmation.", icon: ShieldCheck },
+  { code: "cpe", name: "Fr4nk", role: "Chief Penetration Engineer", detail: "Authorized testing, vulnerability validation, impact confirmation.", icon: ShieldCheck },
   { code: "cre", name: "J4m3", role: "Reverse Analysis Engineer", detail: "Reverse analysis, firmware disassembly, binary unpacking.", icon: Code2 },
   { code: "cce", name: "Nu1L", role: "Cryptography Engineer", detail: "Cryptographic analysis, key review, security assessment.", icon: LockKeyhole },
 ];
@@ -210,8 +210,8 @@ export function LandingContent({ logoSrc, primaryAction }: LandingContentProps) 
       <section className="landing-hero" aria-label="Z3r0 landing page">
         <div className="landing-hero-copy">
           <img className="landing-hero-logo" src={logoSrc} width="1000" height="1000" alt="Z3r0 logo" />
-          <span className="page-eyebrow">Open-source red team collaboration workbench</span>
-          <p>A control-plane-oriented platform for authorized penetration testing, vulnerability discovery, code auditing, and security research.</p>
+          <span className="page-eyebrow">Open-source security assessment workbench</span>
+          <p>A control-plane-oriented platform for authorized testing, vulnerability analysis, code auditing, and technical research.</p>
           <div className="landing-actions">
             <ActionLink action={primaryAction} primary />
             <ActionLink action={{ label: "GitHub", href: landingRepositoryUrl, external: true }} icon={GitBranch} ghost />
@@ -238,7 +238,7 @@ export function LandingContent({ logoSrc, primaryAction }: LandingContentProps) 
 
       <Section
         eyebrow="Evidence model"
-        title="WorkProject drives the assessment from authorized scope to evidence-backed attack paths."
+        title="WorkProject carries each engagement from authorized scope to evidence-backed assessment paths."
         description="Specialists work from graph-targeted assignments with the surrounding assets and evidence in view. Attributed observations support environment relations, security findings, and validated path steps, while the lead reviews conclusions and directs follow-up work."
       >
         <div className="landing-card-grid landing-card-grid-6">
@@ -281,7 +281,8 @@ export function LandingContent({ logoSrc, primaryAction }: LandingContentProps) 
 
       <Section className="landing-security" eyebrow="Operational boundary" title="Authorized use only.">
         <div className="landing-panel landing-boundary">
-          <p>Z3r0 is intended only for lawful, explicitly authorized security testing, risk assessment, code auditing, and research. It does not grant permission to test, scan, access, or affect any third-party system, network, service, account, or data.</p>
+          <p>Use Z3r0 only for lawful security assessment, risk analysis, code auditing, or technical research within a documented scope and with prior written authorization from the system owner or engagement authority covering assets, methods, timing, data handling, monitoring, stop conditions, and cleanup. Obtain separate approval for production systems, personal data, credentials, and third-party services.</p>
+          <p>Z3r0 grants no access rights or testing authority. Any unauthorized, unlawful, or malicious attack, intrusion, compromise, disruption, or data activity is strictly prohibited. Do not exceed scope, bypass safeguards, or collect or alter data without approval. Users bear sole responsibility for applicable law and contracts; <strong>The author and maintainers accept no responsibility for any damage, loss, claim, or legal liability arising from user deployment, configuration, instructions, conduct, or unauthorized use.</strong></p>
           <a className="landing-inline-link" href={landingDocsOverviewUrl} target="_blank" rel="noopener noreferrer">
             Read the documentation
             <ArrowRight size={16} />
@@ -319,11 +320,11 @@ function Section({
 
 function OperationMeshPanel() {
   return (
-    <div className="landing-ops-panel" aria-label="Red team collaboration model">
+    <div className="landing-ops-panel" aria-label="Security assessment collaboration model">
       <div className="landing-ops-panel-heading">
         <div>
           <span className="page-eyebrow">Operation mesh</span>
-          <h2>One authorized scope. Six coordinated specialist roles.</h2>
+          <h2>One documented scope. Six coordinated specialist roles.</h2>
         </div>
         <span className="landing-live-status"><i /> Community built</span>
       </div>

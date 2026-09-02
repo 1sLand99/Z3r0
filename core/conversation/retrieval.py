@@ -23,7 +23,7 @@ _RECENT_TOPIC_LIMIT = 3
 _CURRENT_TEXT_MAX_CHARS = 4_000
 _RECENT_TOPICS_MAX_CHARS = 2_000
 _RECENT_TOPIC_MAX_CHARS = 800
-_EMPTY_SUMMARY_KEYS = frozenset({"none", "无", "暂无", "没有"})
+_EMPTY_SUMMARY_KEYS = frozenset({"none"})
 
 
 class RetrievalSession(Protocol):

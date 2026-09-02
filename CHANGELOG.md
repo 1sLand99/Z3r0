@@ -7,13 +7,14 @@ All notable changes to Z3r0 are documented in this file.
 ### Changed
 
 - Reduced the default sandbox network toolchain to targeted `dnsx`, `httpx`, and `nmap` workflows plus basic command-line diagnostics, and removed the other preloaded network automation with its skills.
+- Reframed public documentation, landing metadata, and interface labels around authorized security assessment and technical research; expanded authorization, data-handling, stop-condition, and responsibility notices; and consolidated the documentation site to English.
 
 ## [0.2.2] - 2026-07-21
 
 ### Added
 
 - Added LightRAG-backed knowledge management with Markdown and PDF ingestion, document processing, vector and graph exploration, and contextual retrieval for Agent tasks.
-- Added graph-driven WorkProject orchestration with target-scoped WorkItems, immutable Evidence, coverage tracking, lead review and retesting, and richer asset, Finding, Attack Path, and Activity records.
+- Added graph-driven WorkProject orchestration with target-scoped WorkItems, immutable Evidence, coverage tracking, lead review and retesting, and richer asset, Finding, assessment-path, and Activity records.
 - Added downloadable Markdown report exports for Agent sessions with configurable retention and automatic cleanup.
 - Expanded the default sandbox with security diagnostics, binary analysis, debugging, Python, browser automation, and dedicated skills.
 
@@ -22,7 +23,7 @@ All notable changes to Z3r0 are documented in this file.
 - Reworked runtime lifecycle, conversation persistence, context budgeting, API contracts, and frontend workflows for more consistent recovery, replay, and long-running task execution.
 - Consolidated backend layer roots into domain packages and centralized OpenAPI and frontend contract generation in the schema export script.
 - Refined the operator workbench with reusable resource components, responsive WorkProject layouts, improved session and transcript views, and updated product documentation.
-- Updated sandbox permissions and project binding, renamed the default sandbox image to `penetration-runtime:latest`, tightened configuration validation, and moved PostgreSQL deployments to the vector-enabled image and data mount layout required by LightRAG.
+- Updated sandbox permissions and project binding, tightened configuration validation, and moved PostgreSQL deployments to the vector-enabled image and data mount layout required by LightRAG.
 
 ### Fixed
 
@@ -37,14 +38,14 @@ All notable changes to Z3r0 are documented in this file.
 
 - Added host management with SSH terminal access and Docker TLS certificate support for managed hosts.
 - Added dynamic sandbox egress proxy management, Tor-only sandbox egress, image-scoped sandbox control ports, and proxied noVNC access with container ownership control.
-- Added bilingual product documentation and a manual GitHub Pages deployment script.
+- Added English product documentation and a manual GitHub Pages deployment script.
 - Added sandbox artifact triage skills and a quick-open action for sub-agent messages.
 
 ### Changed
 
 - Reworked the sandbox proxy into a modular Go proxy with shell, files, WebSocket, entry proxy, egress proxy, and PTY resize handling.
 - Replaced the WorkProject graph renderer with Cytoscape.
-- Strengthened coordinator and specialist agent instructions around coverage, retesting, MITRE ATT&CK-aligned methodology, and failure-seeking completion review.
+- Strengthened coordinator and specialist agent instructions around coverage, retesting, evidence-backed behavior classification, and failure-seeking completion review.
 - Refined frontend layout, resource styling, playground streaming behavior, sandbox controls, and admin resource interactions.
 
 ### Fixed
@@ -58,15 +59,15 @@ All notable changes to Z3r0 are documented in this file.
 
 ### Added
 
-- Added WorkProject attack-chain graphing with assets, findings, attack paths, and auditable record snapshots.
+- Added WorkProject assessment-path graphing with assets, findings, validation paths, and auditable record snapshots.
 - Added project workspace views for graph exploration, record review, and richer project editing.
 - Added Mermaid diagram enforcement and rendering in playground transcripts.
 
 ### Changed
 
-- Refined WorkProject tool contracts around assets, findings, task summaries, shared task updates, graph edges, and attack paths.
+- Refined WorkProject tool contracts around assets, findings, task summaries, shared task updates, graph edges, and assessment paths.
 - Improved project graph layout, task label wrapping, and frontend resource presentation.
-- Repositioned README and landing copy around authorized red-team research and controlled multi-agent workflows.
+- Repositioned README and landing copy around authorized security assessment research and controlled multi-agent workflows.
 
 ### Fixed
 
@@ -98,7 +99,7 @@ All notable changes to Z3r0 are documented in this file.
 ### Added
 
 - Initial public preview release of Z3r0.
-- Multi-agent security workbench with coordinator and specialist agents for code audit, intelligence, penetration validation, reverse engineering, and cryptography review.
+- Multi-agent security workbench with coordinator and specialist agents for code audit, asset intelligence, authorized validation, reverse engineering, and cryptography review.
 - FastAPI backend with authentication, system configuration, work projects, sandbox image/container management, and agent session APIs.
 - React workbench with playground chat, session replay, subagent progress, sandbox selection, file manager, shell access, and admin pages.
 - Docker-backed sandbox execution for controlled command execution, async jobs, browser/noVNC workflows, and file access.

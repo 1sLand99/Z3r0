@@ -8,12 +8,6 @@ const enNav = [
   { text: 'Community', link: '/en/guide/community' }
 ]
 
-const zhNav = [
-  { text: '首页', link: '/zh/' },
-  { text: '快速开始', link: '/zh/guide/quick-start' },
-  { text: '社区', link: '/zh/guide/community' }
-]
-
 const enSidebar = {
   '/en/guide/': [
     {
@@ -28,24 +22,10 @@ const enSidebar = {
   ]
 }
 
-const zhSidebar = {
-  '/zh/guide/': [
-    {
-      text: '说明文档',
-      items: [
-        { text: '概览', link: '/zh/guide/overview' },
-        { text: '快速开始', link: '/zh/guide/quick-start' },
-        { text: '首次使用', link: '/zh/guide/first-use' },
-        { text: '社区', link: '/zh/guide/community' }
-      ]
-    }
-  ]
-}
-
 export default defineConfig({
   base,
   title: 'Z3r0 Documentation',
-  description: 'AI-native red-team workbench for authorized penetration testing and vulnerability research, with specialist agents, sandboxed tooling, evidence records, and replayable timelines.',
+  description: 'AI-assisted security assessment workbench for authorized testing and technical research, with specialist agents, sandboxed tooling, evidence records, and replayable timelines.',
   appearance: 'force-dark',
   lastUpdated: true,
   head: [
@@ -79,16 +59,6 @@ export default defineConfig({
         nav: enNav,
         sidebar: enSidebar,
         outline: { level: [2, 3], label: 'Contents' }
-      }
-    },
-    zh: {
-      label: '简体中文',
-      lang: 'zh-CN',
-      link: '/zh/',
-      themeConfig: {
-        nav: zhNav,
-        sidebar: zhSidebar,
-        outline: { level: [2, 3], label: '目录' }
       }
     }
   }

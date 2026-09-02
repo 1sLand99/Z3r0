@@ -37,7 +37,7 @@ const RELATION_CATEGORY_COLOR: Record<WorkProjectRelationCategory, string> = {
 const RECORD_SIGNALS = [
   ["Active work", "#42d6c5"],
   ["Findings", "#ff7d8a"],
-  ["Attack paths", "#a78bfa"],
+  ["Assessment paths", "#a78bfa"],
 ] as const;
 
 const FIT_PADDING = 84;
@@ -470,7 +470,7 @@ function nodeRows(asset: WorkProjectAsset, recordCounts: AssetRecordCounts): Too
     ["Locator", asset.locator],
     ["Active WorkItems", formatRecordCount(recordCounts.activeWorkItems[asset.id])],
     ["Findings", formatRecordCount(recordCounts.findings[asset.id])],
-    ["Attack Paths", formatRecordCount(recordCounts.attackPaths[asset.id])],
+    ["Assessment Paths", formatRecordCount(recordCounts.attackPaths[asset.id])],
     ["Summary", asset.summary, true],
   ];
   return { title: formatWorkProjectAsset(asset), items: filledDetailItems(items) };

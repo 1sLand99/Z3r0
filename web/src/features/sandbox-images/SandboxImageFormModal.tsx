@@ -42,7 +42,7 @@ export function SandboxImageFormModal({ open, saving, onCancel, onSubmit }: Sand
     >
       <FormField label="Image Name">
         <Input prefix={<Package size={16} />} value={values.image_name}
-          placeholder="ghcr.io/org/image:latest" maxLength={255} required
+          placeholder="Use the exact tag created by sandbox/build.sh" maxLength={255} required
           onChange={(image_name) => setValues((current) => ({ ...current, image_name }))}
         />
       </FormField>

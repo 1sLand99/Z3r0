@@ -5,7 +5,7 @@ editLink: true
 
 # First Use
 
-This guide introduces the primary Z3r0 modules and walks through initial resource configuration and an authorized CTF project workflow.
+This guide introduces the primary Z3r0 modules and a controlled assessment workflow.
 
 ## System Overview
 
@@ -22,7 +22,7 @@ Enter the configured administrator account and password. After successful authen
 The system contains the following core modules:
 
 1. Playground: provides session-based interaction and collaboration with the Agent team.
-2. Work Projects: manages authorized scope, graph-targeted workflow, evidence, findings, attack paths, decisions, and sessions.
+2. Work Projects: manages authorized scope, graph-targeted workflow, evidence, findings, assessment paths, decisions, and sessions.
 3. Knowledges: manages document ingestion, vector inspection, semantic retrieval, and knowledge graph exploration.
 4. Host Management: manages host nodes and orchestrates the runtime environment for sandbox containers.
 5. Egress Proxies: manages unified network egress through HTTP, HTTPS, and SOCKS5 proxies.
@@ -33,7 +33,7 @@ The system contains the following core modules:
 
 ## Start Working
 
-The following sections configure execution resources, create a project, and run an authorized CTF workflow from a clean system state.
+The following sections configure execution resources, create a project, and run an authorized workflow from a clean system state. Before creating the first WorkProject, record written authorization from the organizer or system owner together with the scope, test window, permitted techniques, data restrictions, monitoring contact, stop conditions, and cleanup owner.
 
 ### Manage Knowledge Documents
 
@@ -118,7 +118,7 @@ After the sandbox container is created, use the action buttons on the right side
 
 ### Create a Project
 
-Using an authorized CTF challenge as the target, create a project in `Work Projects`. Fill in the project name, type, description, owners, and sandbox binding. Declare each known scope asset with a kind, canonical locator, name, and criticality. Declared assets are immediately `in_scope`; assets discovered later remain contextual until the lead Agent confirms scope.
+For a permitted laboratory assessment, create a project in `Work Projects`. Fill in the project name, type, description, owners, and sandbox binding. Declare each known scope asset with a kind, canonical locator, name, and criticality. Declared assets are immediately `in_scope`; assets discovered later remain contextual until the lead Agent confirms scope.
 
 ![create-project-1](/images/create-project-1.png)
 
@@ -132,10 +132,10 @@ During execution, open the project workspace to review the eight operational vie
 
 - `Overview` summarizes scope coverage, current assignments, findings, paths, evidence, and active Agents.
 - `Workflow` connects each assignment to assets, test surfaces, dependencies, coverage conclusions, WorkItem-attributed evidence, decisions, and subordinate runs; status and assignee filters support focused review.
-- `Graph` presents environment structure, connectivity, dependencies, identity, trust, data flow, and provenance without mixing in offensive actions.
+- `Graph` presents environment structure, connectivity, dependencies, identity, trust, data flow, and provenance without mixing in validation actions.
 - `Assets` distinguishes declared scope, discovered context, out-of-scope entities, criticality, and stable locators.
 - `Findings` presents validation, severity, impact, remediation, disposition, CWE/CVSS, affected assets, and supporting evidence.
-- `Attack Paths` reconstructs continuous offensive steps with blockers, evidence, and optional ATT&CK mappings.
+- `Assessment Paths` reconstructs continuous, evidence-backed validation steps with blockers and an optional behavior taxonomy.
 - `Evidence` preserves WorkItem-attributed immutable observations with source references, integrity hashes, supersession, and lifecycle state.
 - `Activity` records business-significant state and plan changes, decisions, blockers, handoffs, and results.
 

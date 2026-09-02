@@ -71,7 +71,10 @@ import type {
 type SemiTagColor = "amber" | "green" | "red" | "grey" | "blue" | "cyan";
 
 export const SYSTEM_USER_ROLE_LABEL = labelsFromEnum<SystemUserRole>(SYSTEM_USER_ROLE_VALUES);
-export const WORK_PROJECT_TYPE_LABEL = labelsFromEnum<WorkProjectType>(WORK_PROJECT_TYPE_VALUES, { [WORK_PROJECT_TYPE.SOURCE_CODE_AUDIT]: "Source Code Audit" });
+export const WORK_PROJECT_TYPE_LABEL = labelsFromEnum<WorkProjectType>(WORK_PROJECT_TYPE_VALUES, {
+  [WORK_PROJECT_TYPE.PENETRATION_TEST]: "Authorized Security Assessment",
+  [WORK_PROJECT_TYPE.SOURCE_CODE_AUDIT]: "Source Code Audit",
+});
 export const WORK_PROJECT_STATUS_LABEL = labelsFromEnum<WorkProjectStatus>(WORK_PROJECT_STATUS_VALUES);
 export const WORK_PROJECT_ASSET_KIND_LABEL = labelsFromEnum<WorkProjectAssetKind>(WORK_PROJECT_ASSET_KIND_VALUES);
 export const WORK_PROJECT_ASSET_ORIGIN_LABEL = labelsFromEnum<WorkProjectAssetOrigin>(WORK_PROJECT_ASSET_ORIGIN_VALUES);
@@ -89,9 +92,27 @@ export const WORK_PROJECT_FINDING_VERIFICATION_LABEL = labelsFromEnum<WorkProjec
 export const WORK_PROJECT_FINDING_RESOLUTION_LABEL = labelsFromEnum<WorkProjectFindingResolution>(WORK_PROJECT_FINDING_RESOLUTION_VALUES);
 export const WORK_PROJECT_ATTACK_PATH_STATUS_LABEL = labelsFromEnum<WorkProjectAttackPathStatus>(WORK_PROJECT_ATTACK_PATH_STATUS_VALUES);
 export const WORK_PROJECT_ATTACK_STEP_STATUS_LABEL = labelsFromEnum<WorkProjectAttackStepStatus>(WORK_PROJECT_ATTACK_STEP_STATUS_VALUES);
-export const WORK_PROJECT_ATTACK_ACTION_LABEL = labelsFromEnum<WorkProjectAttackAction>(WORK_PROJECT_ATTACK_ACTION_VALUES);
+export const WORK_PROJECT_ATTACK_ACTION_LABEL = labelsFromEnum<WorkProjectAttackAction>(WORK_PROJECT_ATTACK_ACTION_VALUES, {
+  initial_access: "Entry Condition",
+  execution: "Execution Check",
+  persistence: "State Retention Check",
+  privilege_escalation: "Privilege Boundary Check",
+  defense_evasion: "Control Visibility Check",
+  credential_access: "Credential Handling Check",
+  discovery: "Environment Discovery",
+  lateral_movement: "Cross-System Access Check",
+  collection: "Data Handling Check",
+  command_and_control: "Remote Communication Check",
+  exfiltration: "Data Transfer Check",
+  impact: "Impact Assessment",
+});
 export const WORK_PROJECT_WORK_ITEM_STATUS_LABEL = labelsFromEnum<WorkProjectWorkItemStatus>(WORK_PROJECT_WORK_ITEM_STATUS_VALUES);
-export const WORK_PROJECT_WORK_ITEM_PHASE_LABEL = labelsFromEnum<WorkProjectWorkItemPhase>(WORK_PROJECT_WORK_ITEM_PHASE_VALUES);
+export const WORK_PROJECT_WORK_ITEM_PHASE_LABEL = labelsFromEnum<WorkProjectWorkItemPhase>(WORK_PROJECT_WORK_ITEM_PHASE_VALUES, {
+  reconnaissance: "Surface Review",
+  enumeration: "Asset Inventory",
+  exploitation: "Controlled Impact Validation",
+  post_exploitation: "Post-Assessment Review",
+});
 export const WORK_PROJECT_WORK_ITEM_PRIORITY_LABEL = labelsFromEnum<WorkProjectWorkItemPriority>(WORK_PROJECT_WORK_ITEM_PRIORITY_VALUES);
 export const WORK_PROJECT_TARGET_STATUS_LABEL = labelsFromEnum<WorkProjectTargetStatus>(WORK_PROJECT_TARGET_STATUS_VALUES);
 export const WORK_PROJECT_WORK_LOG_KIND_LABEL = labelsFromEnum<WorkProjectWorkLog["kind"]>(WORK_PROJECT_WORK_LOG_KIND_VALUES);

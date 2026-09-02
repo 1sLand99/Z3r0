@@ -5,7 +5,13 @@ editLink: true
 
 # Quick Start
 
-This guide covers the required configuration, sandbox image build, and deployment steps for production and development environments.
+This guide covers configuration, sandbox image build, and deployment for production and development environments.
+
+> :warning: Authorization and Safety
+>
+> Deploy Z3r0 only on systems you own or administer, or under written authorization from the system owner or engagement authority covering assets, methods, timing, data handling, monitoring, stop conditions, and cleanup. Any unauthorized, unlawful, or malicious attack, intrusion, compromise, disruption, or data activity is strictly prohibited. Prefer isolated systems and synthetic data; obtain separate approval for production systems, personal data, credentials, or third-party services. Sandbox and egress controls reduce operational risk without changing authorization or legal responsibility.
+>
+> **Users bear sole responsibility for deployment and conduct. The author and maintainers accept no responsibility for any damage, loss, claim, or legal liability arising from user deployment, configuration, instructions, conduct, or unauthorized use.**
 
 > :warning: Iteration Notice
 >
@@ -44,7 +50,7 @@ Build the sandbox image used for isolated task execution:
 cd sandbox && bash build.sh
 ```
 
-The build produces `penetration-runtime:latest`. Add a matching image record in `Sandbox Images` before creating a container.
+The build output identifies the image tag that it creates. Register that exact tag in `Sandbox Images` before creating a container; if you customize `sandbox/build.sh`, update the image record to match.
 
 ## Production Environment
 

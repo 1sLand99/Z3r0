@@ -3,11 +3,6 @@
 </p>
 
 <p align="center">
-  <strong>English</strong> ·
-  <a href="README_zh.md">中文</a>
-</p>
-
-<p align="center">
   <a href="#architecture">Architecture</a> ·
   <a href="#runtime-flow">Runtime Flow</a> ·
   <a href="#evidence-model">Evidence Model</a> ·
@@ -17,24 +12,24 @@
 </p>
 
 <p align="center">
-  <strong>Open-source red team collaboration workbench for authorized penetration testing, vulnerability discovery, code auditing, and security research.</strong>
+  <strong>Open-source security assessment workbench for authorized testing, vulnerability analysis, code auditing, and technical research.</strong>
 </p>
 
 ---
 
-> :warning: **Security Notice**
+> :warning: **Security and Legal Notice**
 >
-> This project is intended only for security testing, risk assessment, and academic research within legal and explicitly authorized scopes. It must not be used for unlawful, unauthorized, or destructive purposes.
+> Use Z3r0 only for lawful security assessment, risk analysis, code auditing, or technical research within a documented scope and with prior written authorization from the system owner or engagement authority. Define permitted assets, methods, timing, data handling, monitoring, stop conditions, and cleanup before work begins. Obtain separate approval for production systems, personal data, credentials, and third-party services.
 >
-> This project does not grant permission to test, access, scan, or affect any third-party systems, networks, services, accounts, or data.
+> Z3r0 grants no access rights or testing authority. Any unauthorized, unlawful, or malicious attack, intrusion, compromise, disruption, or data activity is strictly prohibited. Do not exceed scope, bypass safeguards, or collect or alter data without approval; stop when authorization, ownership, scope, or safety is unclear.
 >
-> **The author is not responsible for any consequences, losses, damages, legal liabilities, or unlawful behavior caused by users.**
+> **Users bear sole responsibility for deployment, conduct, and compliance with applicable law and contractual requirements. The author and maintainers accept no responsibility for any damage, loss, claim, or legal liability arising from user deployment, configuration, instructions, conduct, or unauthorized use.**
 
 ## Overview
 
-Z3r0 is a control-plane-oriented red team workbench. It combines a React operator console, a FastAPI management plane, a session-based multi-Agent runtime, project-scoped evidence records, distributed Docker sandbox resources, and a controlled egress layer.
+Z3r0 is a control-plane-oriented security assessment workbench. It combines a React operator console, a FastAPI management plane, a session-based multi-Agent runtime, project-scoped evidence records, distributed Docker sandbox resources, and a controlled egress layer.
 
-Z3r0 brings authorized scope, asset relationships, specialist assignments, evidence, findings, attack paths, workflow decisions, sandbox resources, and session timelines into one shared workspace. Red teams can coordinate execution, follow assessment progress, trace conclusions to supporting material, and review the complete operation without reconstructing state from separate conversations and tools.
+Z3r0 brings authorized scope, asset relationships, specialist assignments, evidence, findings, assessment paths, workflow decisions, sandbox resources, and session timelines into one shared workspace. Security teams can coordinate approved activities, follow assessment progress, trace conclusions to supporting material, and review the complete engagement without reconstructing state from separate conversations and tools.
 
 ## Architecture
 
@@ -56,7 +51,7 @@ flowchart TB
     Project["WorkProject"]
     GraphData["Assets / Environment Relations"]
     Workflow["WorkItems / Targets / WorkLog"]
-    Conclusions["Evidence / Findings / Attack Paths"]
+    Conclusions["Evidence / Findings / Assessment Paths"]
   end
 
   subgraph Execution["Execution Plane"]
@@ -102,7 +97,7 @@ Z3r0 separates the system into four architectural planes:
 | --- | --- |
 | Control plane | Users, system configuration, Agents, sessions, WorkProjects, Knowledges, managed hosts, sandbox images, sandbox containers, and egress proxies. |
 | Runtime plane | Multi-Agent session execution, task-input LightRAG retrieval, live event streaming, long-running task continuity, history projection, and timeline replay. |
-| Evidence plane | Authorized scope, asset relationships, graph-targeted WorkItems, immutable evidence, findings, attack paths, target coverage, and workflow decisions. |
+| Evidence plane | Authorized scope, asset relationships, graph-targeted WorkItems, immutable evidence, findings, assessment paths, target coverage, and workflow decisions. |
 | Execution plane | Docker hosts, sandbox containers, shell/file/noVNC access, command execution, sandbox-local skills, built-in security tooling, and outbound network policy. |
 
 This separation is reflected in the repository structure: routers and handlers expose application contracts, services own domain behavior, models define persistent state, and the React workbench consumes the stable REST/WebSocket surface.
@@ -156,7 +151,7 @@ flowchart LR
   Work["Graph-targeted WorkItems<br/>targets / dependencies / coverage"]
   Evidence["WorkItem-linked Evidence<br/>stable reference / provenance / hash"]
   Findings["Security Findings<br/>validation / severity / disposition"]
-  Paths["Attack Paths<br/>evidence-backed offensive steps"]
+  Paths["Assessment Paths<br/>evidence-backed validation steps"]
   Review["Review<br/>workflow / graph / conclusions / activity"]
 
   Scope --> GraphData --> Work --> Evidence
@@ -166,7 +161,7 @@ flowchart LR
   Work --> Review
 ```
 
-WorkProject provides a durable workspace for each assessment. Operators can explore the target environment as an asset graph, assign specialists to specific assets and test surfaces, review the evidence produced by each assignment, and follow validated offensive progression through attack paths. Findings and path conclusions remain connected to their supporting material, giving the team a coherent record from initial scope through review and retesting.
+WorkProject provides a durable workspace for each assessment. Operators can explore the authorized environment as an asset graph, assign specialists to specific assets and test surfaces, review the evidence produced by each assignment, and follow validated assessment sequences. Findings and path conclusions remain connected to their supporting material, giving the team a coherent record from initial scope through review and retesting.
 
 | Data object | Role in the assessment |
 | --- | --- |
@@ -176,9 +171,9 @@ WorkProject provides a durable workspace for each assessment. Operators can expl
 | WorkItem | Coordinated action unit connecting an assigned specialist with graph targets, dependencies, test surfaces, completion criteria, evidence, coverage conclusions, and lead review. |
 | Evidence | Immutable WorkItem-attributed observation with provenance, a stable source reference, supersession, and guarded invalidation. |
 | Finding | Evidence-backed security conclusion with validation, impact, disposition, and severity kept consistent with optional CVSS scoring. |
-| Attack path | Continuous sequence of offensive actions from entry to target, with evidence and optional ATT&CK mapping per step. |
+| Assessment path | Continuous sequence of bounded validation steps from an observed entry condition to an affected target, with evidence and optional behavior taxonomy per step. |
 
-The workbench gives operators a unified view of scope coverage, current assignments, blocked test surfaces, review queues, validated findings, attack paths, evidence, and specialist activity. Leads can review completed work, return specific target surfaces for further validation, and use focused search and filters to move quickly from project-level posture to the relevant asset, assignment, evidence chain, or security conclusion.
+The workbench gives operators a unified view of scope coverage, current assignments, blocked test surfaces, review queues, validated findings, assessment paths, evidence, and specialist activity. Leads can review completed work, return specific target surfaces for further validation, and use focused search and filters to move quickly from project-level posture to the relevant asset, assignment, evidence chain, or security conclusion.
 
 ## Sandbox and Egress
 
@@ -211,7 +206,7 @@ flowchart TB
 
 Sandbox resources are managed infrastructure. Administrators manage Docker hosts, sandbox images, running containers, exposed ports, and project bindings. Operators and Agents work through selected running containers, and the same sandbox boundary supports command execution, Shell sessions, file management, browser/noVNC review, and sandbox-local skills.
 
-The default sandbox image provides a focused security workspace with targeted DNS and ownership checks (`dnsx`, `dig`, `nslookup`, `whois`), low-volume HTTP inspection (`curl`, `wget`, `httpx`, `openssl`), focused service diagnostics (`nc`, `nmap`), local file and archive triage (`file`, `sha256sum`, `7z`, `unzip`, `tar`, `readelf`), Android and firmware analysis (`jadx`, `apktool`, Ghidra, `binwalk`), binary and pwn tooling (`gdb`, Pwndbg, `strace`, `ltrace`, `pwntools`, and the `pwntools`-provided `checksec`), browser automation through `agent-browser-cli`, and Python workflows through `uv`.
+The default sandbox image provides a focused security workspace with targeted DNS and ownership checks (`dnsx`, `dig`, `nslookup`, `whois`), low-volume HTTP inspection (`curl`, `wget`, `httpx`, `openssl`), focused service diagnostics (`nc`, `nmap`), local file and archive triage (`file`, `sha256sum`, `7z`, `unzip`, `tar`, `readelf`), Android and firmware analysis (`jadx`, `apktool`, Ghidra, `binwalk`), binary diagnostics and controlled interaction tooling (`gdb`, `strace`, `ltrace`, and `checksec`), browser automation through `agent-browser-cli`, and Python workflows through `uv`. Use every tool only against supplied artifacts or explicitly approved assessment targets.
 
 Outbound traffic is normalized through a container-level egress profile. The sandbox runtime exports proxy environment variables to a local proxy inside the container; the control plane can update the upstream policy to direct access or a managed HTTP, HTTPS, or SOCKS5 proxy. This gives the platform a unified place to manage network identity, traffic routing, and operator-environment isolation.
 
@@ -220,13 +215,13 @@ Outbound traffic is normalized through a container-level egress profile. The san
 | Highlight | Description |
 | --- | --- |
 | Multi-Agent orchestration | A lead Agent coordinates specialist Agents for intelligence gathering, validation, code audit, reverse analysis, and cryptanalysis. |
-| Graph-driven operations | WorkProject binds specialist WorkItems to in-scope assets, test surfaces, evidence, findings, and attack-path validation. |
+| Graph-driven operations | WorkProject binds specialist WorkItems to in-scope assets, test surfaces, evidence, findings, and assessment-path validation. |
 | Retrieval context plane | Building knowledge graphs with LightRAG Core provides matching original document chunks and graph context for task-oriented inputs. |
 | Replayable event timeline | The UI consumes normalized timeline events that can be streamed live or loaded later as history. |
 | Distributed sandbox resources | Managed Docker hosts, images, and containers allow execution environments to be isolated, scaled, and assigned to projects. |
 | Preloaded sandbox toolchain | The default image provides targeted DNS, HTTP, and service diagnostics plus local artifact, Android, firmware, reverse engineering, browser, and Python capabilities behind sandbox-local skills. |
 | Unified egress layer | Container traffic can be routed through direct, HTTP, HTTPS, or SOCKS5 modes using one platform-managed policy surface. |
-| Operator workbench | The frontend combines chat, workflow state, graph review, evidence chains, attack paths, sandbox selector, terminal, files, and noVNC. |
+| Operator workbench | The frontend combines chat, workflow state, graph review, evidence chains, assessment paths, sandbox selector, terminal, files, and noVNC. |
 
 ## Expert Team
 
@@ -235,7 +230,7 @@ Outbound traffic is normalized through a container-level egress profile. The san
 | `cso` | Z3r0 | Chief Security Lead | Task decomposition, team coordination, result integration |
 | `cae` | V3ra | Code Audit Engineer | Source code auditing, dependency review, remediation verification |
 | `cie` | L1ly | Intelligence Gathering Engineer | Intelligence gathering, asset discovery, relationship mapping |
-| `cpe` | Fr4nk | Penetration Testing Engineer | Penetration testing, vulnerability validation, impact confirmation |
+| `cpe` | Fr4nk | Chief Penetration Engineer | Authorized testing, vulnerability validation, impact confirmation |
 | `cre` | J4m3 | Reverse Analysis Engineer | Reverse analysis, firmware disassembly, binary unpacking |
 | `cce` | Nu1L | Cryptography Engineer | Cryptographic analysis, key review, security assessment |
 

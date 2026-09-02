@@ -22,7 +22,7 @@ export function WorkProjectWorkspacePage() {
     { label: "Active Work", value: project?.active_work_item_count ?? 0 },
     { label: "Blocked", value: project?.blocked_work_item_count ?? 0 },
     { label: "Validated Findings", value: project?.validated_finding_count ?? 0 },
-    { label: "Open Paths", value: project?.active_attack_path_count ?? 0 },
+    { label: "Open Assessment Paths", value: project?.active_attack_path_count ?? 0 },
   ], [project]);
 
   return (

@@ -102,7 +102,7 @@ function ChatEmptyState() {
       <p>
         Ask the security operations agent anything
         <br />
-        - penetration tests, code audits, or threat triage.
+        - authorized assessments, code audits, or threat triage.
       </p>
     </div>
   );

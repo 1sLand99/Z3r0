@@ -1,22 +1,22 @@
 export const landingSeo = {
   siteUrl: "https://z3r0.fans/",
   siteName: "Z3r0",
-  title: "Z3r0 - Red Team Collaboration Workbench for Authorized Security Work",
+  title: "Z3r0 - Security Assessment Workbench for Authorized Testing",
   description:
-    "Z3r0 is an open-source red team collaboration workbench with graph-driven specialist assignments, attributable evidence chains, lead review, validated findings and attack paths, distributed Docker sandboxes, controlled egress, and replayable timelines.",
+    "Z3r0 is an open-source security assessment workbench with graph-driven specialist assignments, attributable evidence chains, lead review, validated findings and assessment paths, distributed Docker sandboxes, controlled egress, and replayable timelines.",
   imagePath: "assets/z3r0-logo.png",
   imageAlt: "Z3r0 logo",
   keywords: [
     "Z3r0",
-    "red team collaboration workbench",
-    "multi-agent red team platform",
-    "authorized penetration testing",
-    "authorized pentesting",
-    "vulnerability research",
+    "security assessment workbench",
+    "multi-agent security assessment platform",
+    "authorized security testing",
+    "controlled vulnerability analysis",
+    "technical security research",
     "vulnerability validation",
-    "red team orchestration",
-    "attack path analysis",
-    "attack path replay",
+    "security assessment orchestration",
+    "assessment path analysis",
+    "assessment path replay",
     "sandboxed security tooling",
     "preloaded sandbox security tools",
     "distributed Docker sandbox",
@@ -26,11 +26,11 @@ export const landingSeo = {
     "targeted DNS diagnostics",
     "low-volume HTTP inspection",
     "reverse engineering sandbox",
-    "pwntools sandbox",
+    "binary diagnostics sandbox",
     "Ghidra sandbox",
     "evidence records",
     "asset relationship graph",
-    "graph-driven red team workflow",
+    "graph-driven assessment workflow",
     "security evidence chain",
     "WorkProject records",
     "code audit automation",
@@ -70,7 +70,7 @@ export const structuredData = [
         name: "What is Z3r0?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Z3r0 is an open-source red team collaboration workbench for authorized penetration testing, vulnerability discovery, code auditing, and security research.",
+          text: "Z3r0 is an open-source security assessment workbench for authorized testing, vulnerability analysis, code auditing, and technical research.",
         },
       },
       {
@@ -78,7 +78,7 @@ export const structuredData = [
         name: "Who is Z3r0 designed for?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Z3r0 is designed for authorized red teams, penetration testers, vulnerability researchers, internal security teams, code auditors, reverse engineers, cryptography reviewers, and controlled research environments.",
+          text: "Z3r0 is designed for internal security teams, authorized assessment practitioners, vulnerability researchers, code auditors, reverse engineers, cryptography reviewers, and controlled research environments.",
         },
       },
       {
@@ -86,7 +86,7 @@ export const structuredData = [
         name: "How does Z3r0 run security tooling?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Z3r0 binds agent tools and manual review workflows to controlled Docker sandbox containers with command execution, file access, shell access, browser workflows, noVNC review, sandbox-local skills, controlled egress, targeted network diagnostics, local artifact triage, Android and firmware analysis, reverse engineering, pwn workflows, and Python tasks.",
+          text: "Z3r0 binds agent tools and manual review workflows to controlled Docker sandbox containers with command execution, file access, shell access, browser workflows, noVNC review, sandbox-local skills, controlled egress, targeted network diagnostics, local artifact triage, Android and firmware analysis, reverse engineering, binary diagnostics, and Python tasks.",
         },
       },
       {
@@ -94,7 +94,15 @@ export const structuredData = [
         name: "What environments should use Z3r0?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Z3r0 should be used only within lawful and explicitly authorized, trusted, and isolated environments where Docker access, model credentials, terminal access, and sandbox containers can be governed as high-privilege assets.",
+          text: "Z3r0 is for lawful, explicitly authorized use in trusted, isolated environments. Any unauthorized, unlawful, or malicious attack, intrusion, compromise, disruption, or data activity is strictly prohibited. Confirm written scope, permitted methods, data handling, monitoring, stop conditions, and cleanup before work begins. Operators bear sole responsibility for applicable legal and contractual requirements; the author and maintainers accept no responsibility for any damage, loss, claim, or legal liability arising from user deployment, configuration, instructions, conduct, or unauthorized use.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "What authorization is required?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Obtain prior written authorization from the system owner or engagement authority. Define the assets, methods, time window, data handling, monitoring, stop conditions, and cleanup. Z3r0 grants no permission to test third-party systems or data.",
         },
       },
     ],
