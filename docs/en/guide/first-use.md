@@ -5,7 +5,7 @@ editLink: true
 
 # First Use
 
-This guide introduces the primary Z3r0 modules and a controlled assessment workflow.
+This guide introduces the primary Z3r0 modules and an operator-guided, multi-agent workflow for authorized penetration testing, vulnerability discovery, code auditing, and security research.
 
 ## System Overview
 
@@ -21,19 +21,32 @@ Enter the configured administrator account and password. After successful authen
 
 The system contains the following core modules:
 
-1. Playground: provides session-based interaction and collaboration with the Agent team.
-2. Work Projects: manages authorized scope, graph-targeted workflow, evidence, findings, assessment paths, decisions, and sessions.
-3. Knowledges: manages document ingestion, vector inspection, semantic retrieval, and knowledge graph exploration.
-4. Host Management: manages host nodes and orchestrates the runtime environment for sandbox containers.
-5. Egress Proxies: manages unified network egress through HTTP, HTTPS, and SOCKS5 proxies.
-6. Sandbox Images: manages customized sandbox images, including the default image with sandbox-local skills and preloaded security tooling.
-7. Sandbox Containers: orchestrates runnable sandbox containers with command execution, files, noVNC/browser review, and egress configuration.
-8. System Users: manages system users, roles, and related identity information.
-9. System Config: manages Agent runtime, Agent models, and independent LightRAG embedding and extraction configuration.
+1. `Playground`: provides session-based interaction and collaboration with the agent team.
+2. `Work Projects`: manages authorized scope, graph-targeted workflow, evidence, findings, attack paths, decisions, and sessions.
+3. `Knowledges`: manages document ingestion, vector inspection, semantic retrieval, and knowledge graph exploration.
+4. `Host Management`: manages host nodes and orchestrates the runtime environment for sandbox containers.
+5. `Egress Proxies`: manages unified network egress through HTTP, HTTPS, and SOCKS5 proxies.
+6. `Sandbox Images`: manages customized sandbox images, including the default image with sandbox-local skills and preloaded security tooling.
+7. `Sandbox Containers`: orchestrates runnable sandbox containers with command execution, files, noVNC/browser review, and egress configuration.
+8. `System Users`: manages system users, roles, and related identity information.
+9. `System Config`: manages the agent runtime, agent models, and independent LightRAG embedding and extraction configuration.
 
 ## Start Working
 
-The following sections configure execution resources, create a project, and run an authorized workflow from a clean system state. Before creating the first WorkProject, record written authorization from the organizer or system owner together with the scope, test window, permitted techniques, data restrictions, monitoring contact, stop conditions, and cleanup owner.
+The following sections configure execution resources, create a project, and run a workflow from a clean system state. Before creating the first `WorkProject`, record its scope, methods, test window, data handling, monitoring contact, stop conditions, and cleanup owner.
+
+## Operation Limits
+
+Record these limits in the `WorkProject` before assigning an agent. They apply to every sandbox, host, identity, and egress path:
+
+| limit | required baseline |
+| --- | --- |
+| scope and method | Tie each action to a declared in-scope asset, an active `WorkItem`, and an approved method. Keep newly discovered assets contextual until the lead agent confirms scope. |
+| impact | Do not materially damage, degrade, or interrupt targets or make unapproved changes. Malware, persistence, unauthorized privilege acquisition, lateral movement, data exfiltration, destructive writes, and resource exhaustion are prohibited. |
+| execution | Prefer passive or read-only checks with least-privilege identities, synthetic or canary data, conservative rates, bounded concurrency, explicit time and retry limits, payload limits, and monitored resource ceilings. |
+| evidence and recovery | Use the narrowest reversible proof, collect only necessary evidence, redact sensitive data, and define retention, stop, monitoring, rollback, and cleanup arrangements. |
+
+Sandbox isolation and egress controls reduce operational risk but do not expand the active project scope. If validation would exceed a limit, mark the `WorkItem` blocked and replan before continuing.
 
 ### Manage Knowledge Documents
 
@@ -106,7 +119,7 @@ In the `Sandbox Images` module, create an image record. The image name must matc
 
 ### Create a Container
 
-In the `Sandbox Containers` module, create a container and select the corresponding remote host and sandbox image. During container creation, you can specify the container egress mode. Z3r0 supports direct connection, HTTP, HTTPS, SOCKS5, and Tor. HTTP, HTTPS, and SOCKS5 require proxy entries to be configured in advance in the `Egress Proxies` module.
+In the `Sandbox Containers` module, create a container and select the corresponding remote host and sandbox image. During container creation, choose one of the three egress modes: direct, proxy, or Tor. Proxy mode requires an entry in `Egress Proxies`, which supports HTTP, HTTPS, and SOCKS5 upstreams.
 
 ![create-container-1](/images/create-container-1.png)
 
@@ -116,30 +129,30 @@ After the sandbox container is created, use the action buttons on the right side
 
 ![create-container-2](/images/create-container-2.png)
 
-### Create a Project
+### Create a Work Project
 
-For a permitted laboratory assessment, create a project in `Work Projects`. Fill in the project name, type, description, owners, and sandbox binding. Declare each known scope asset with a kind, canonical locator, name, and criticality. Declared assets are immediately `in_scope`; assets discovered later remain contextual until the lead Agent confirms scope.
+Open `Work Projects` and click `Create Project`. Fill in the project name, type, description, owners, and sandbox binding. Record the project scope and operation limits in the project description or `WorkItem` plan, then declare each known scope asset with its kind, canonical locator, name, and criticality. Declared assets are immediately `in_scope`; discovered assets remain contextual until the lead agent confirms scope.
 
 ![create-project-1](/images/create-project-1.png)
 
 ### Execute the Workflow
 
-After the WorkProject is created, it appears in `Playground`. Open it, create a session, and assign the authorized objective to the Agent team. The lead Agent reads the scope and graph, prepares WorkItems with target assets and completion criteria, then coordinates the appropriate specialist for each assignment.
+After the `WorkProject` is created, it appears in `Playground`. Open it, create a session, and assign the requested objective to the agent team. The lead agent reads the scope and graph, prepares work items with target assets and completion criteria, then coordinates the appropriate specialist for each assignment.
 
 ![project-example-1](/images/project-example-1.png)
 
 During execution, open the project workspace to review the eight operational views:
 
-- `Overview` summarizes scope coverage, current assignments, findings, paths, evidence, and active Agents.
-- `Workflow` connects each assignment to assets, test surfaces, dependencies, coverage conclusions, WorkItem-attributed evidence, decisions, and subordinate runs; status and assignee filters support focused review.
+- `Overview` summarizes scope coverage, current assignments, findings, attack paths, evidence, and active agents.
+- `Workflow` connects each assignment to assets, test surfaces, dependencies, coverage conclusions, work-item-attributed evidence, decisions, and subordinate runs; status and assignee filters support focused review.
 - `Graph` presents environment structure, connectivity, dependencies, identity, trust, data flow, and provenance without mixing in validation actions.
 - `Assets` distinguishes declared scope, discovered context, out-of-scope entities, criticality, and stable locators.
-- `Findings` presents validation, severity, impact, remediation, disposition, CWE/CVSS, affected assets, and supporting evidence.
-- `Assessment Paths` reconstructs continuous, evidence-backed validation steps with blockers and an optional behavior taxonomy.
-- `Evidence` preserves WorkItem-attributed immutable observations with source references, integrity hashes, supersession, and lifecycle state.
+- `Findings` presents verification, severity, impact, recommendation, resolution, CWE/CVSS, affected assets, and supporting evidence.
+- `Attack Paths` reconstruct continuous, evidence-backed validation steps with blockers and supporting evidence.
+- `Evidence` preserves work-item-attributed immutable observations with source references, integrity hashes, supersession, and lifecycle state.
 - `Activity` records business-significant state and plan changes, decisions, blockers, handoffs, and results.
 
-Each specialist receives the assignment, target coverage, supporting Evidence, surrounding graph, and relevant retest opportunities needed for the current task. Evidence remains attributed to the WorkItem as relationships, findings, and path steps are validated. Once every target has a conclusion and the result is ready, the lead Agent can accept the work or return specific target surfaces for further analysis. Useful negative results remain available as evidence and can close a test surface without inventing a vulnerability. New credentials, trust relationships, routes, versions, code paths, and keys bring related follow-up and retest work into view.
+Each specialist receives the assignment, target coverage, supporting evidence, surrounding graph, and relevant retest opportunities. Evidence remains attributed to the work item as relations, findings, and attack path steps are validated. Once every target has a conclusion, the lead agent accepts the work or returns specific surfaces for further analysis. Negative results remain available as evidence and can close a test surface without inventing a vulnerability. New credentials, trust relationships, routes, versions, code paths, and keys create related follow-up and retest opportunities.
 
 ![project-example-2](/images/project-example-2.png)
 

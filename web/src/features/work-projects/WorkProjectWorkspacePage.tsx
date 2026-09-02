@@ -17,12 +17,12 @@ export function WorkProjectWorkspacePage() {
   const { project, loading } = useWorkProjectDetails(validProjectId);
 
   const metrics = useMemo(() => [
-    { label: "In Scope", value: project?.in_scope_asset_count ?? 0 },
-    { label: "Untouched", value: project?.untouched_asset_count ?? 0 },
-    { label: "Active Work", value: project?.active_work_item_count ?? 0 },
-    { label: "Blocked", value: project?.blocked_work_item_count ?? 0 },
-    { label: "Validated Findings", value: project?.validated_finding_count ?? 0 },
-    { label: "Open Assessment Paths", value: project?.active_attack_path_count ?? 0 },
+    { label: "In-scope assets", value: project?.in_scope_asset_count ?? 0 },
+    { label: "Untouched assets", value: project?.untouched_asset_count ?? 0 },
+    { label: "Active work items", value: project?.active_work_item_count ?? 0 },
+    { label: "Blocked work items", value: project?.blocked_work_item_count ?? 0 },
+    { label: "Validated findings", value: project?.validated_finding_count ?? 0 },
+    { label: "Active attack paths", value: project?.active_attack_path_count ?? 0 },
   ], [project]);
 
   return (

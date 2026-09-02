@@ -85,7 +85,7 @@ export function AdminLayout() {
           <img className="brand-logo" src={z3r0Logo} alt="" />
           <div>
             <div className="brand-name">Z3r0</div>
-            <div className="brand-kicker">Security Assessment Platform</div>
+            <div className="brand-kicker">Intelligent Multi-agent Security Assessment Workbench</div>
           </div>
         </div>
 

@@ -51,7 +51,7 @@ export function LoginPage() {
         <div className="login-brand">
           <img className="brand-logo large" src={z3r0Logo} alt="" />
           <div>
-            <span className="login-kicker">Security Assessment Platform</span>
+            <span className="login-kicker">Intelligent Multi-agent Security Assessment Workbench</span>
             <h1 id="login-title">Z3r0 Console</h1>
           </div>
         </div>

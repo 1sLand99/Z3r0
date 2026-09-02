@@ -5,17 +5,19 @@ editLink: true
 
 # Quick Start
 
-This guide covers configuration, sandbox image build, and deployment for production and development environments.
+This guide covers configuration, sandbox image build, and deployment of Z3r0's intelligent, operator-guided multi-agent security assessment workbench for authorized penetration testing, vulnerability discovery, code auditing, and research.
 
 > :warning: Authorization and Safety
 >
-> Deploy Z3r0 only on systems you own or administer, or under written authorization from the system owner or engagement authority covering assets, methods, timing, data handling, monitoring, stop conditions, and cleanup. Any unauthorized, unlawful, or malicious attack, intrusion, compromise, disruption, or data activity is strictly prohibited. Prefer isolated systems and synthetic data; obtain separate approval for production systems, personal data, credentials, or third-party services. Sandbox and egress controls reduce operational risk without changing authorization or legal responsibility.
+> Z3r0 assumes that deployment and user-provided objectives and targets are lawfully authorized. It grants no additional access rights; the active project scope and runtime controls define execution boundaries.
 >
-> **Users bear sole responsibility for deployment and conduct. The author and maintainers accept no responsibility for any damage, loss, claim, or legal liability arising from user deployment, configuration, instructions, conduct, or unauthorized use.**
+> **Operators remain responsible for deployment, conduct, and compliance with applicable law and contracts. The author and maintainers accept no responsibility for damage, loss, claims, or liability arising from user deployment, configuration, instructions, conduct, or misuse.**
 
 > :warning: Iteration Notice
 >
 > Z3r0 is under active development. Review release notes before upgrading, pin production deployments to a tested revision, and back up configuration and PostgreSQL data before applying changes.
+
+Before exposing a sandbox or starting an assessment, apply the controls in [Overview](./overview#non-destructive-operation): use an isolated environment, declared scope, least-privilege identities, passive or read-only checks, conservative execution limits, monitored egress, and a documented stop and cleanup path. Do not deploy malware, establish persistence, acquire unauthorized privileges, move laterally, exfiltrate data, perform destructive writes, or exhaust service resources. Isolation and egress controls reduce operational risk but do not expand the active project scope.
 
 ## Before You Start
 
@@ -23,7 +25,7 @@ This guide covers configuration, sandbox image build, and deployment for product
 
 Z3r0 requires the following configuration and infrastructure:
 
-| Item | Description |
+| item | description |
 | --- | --- |
 | `.z3r0/config.json` | System runtime configuration |
 | `.z3r0/agents/*` | Agent role and instruction files |
@@ -64,20 +66,18 @@ cp .z3r0/config.json.example .z3r0/config.json
 
 Edit the system runtime configuration in `.z3r0/config.json`, mainly updating the following items:
 
-| Item | Description |
+| item | description |
 | --- | --- |
 | `system.encrypt_key` | System data encryption key. This must be changed. A random string of at least 32 bytes is recommended. |
 | `system.bootstrap_admin` | Default system administrator information. This must be changed. A strong password is recommended. |
 | `database` | System database connection information. The bundled production Compose deployment uses host networking, so `host` remains `127.0.0.1`. |
-| `agents.*` | LLM API configuration for each Agent. Providers and models can be configured separately by role. |
+| `agents.*` | LLM API configuration for each agent. Providers and models can be configured separately by role. |
 | `lightrag.embedding_*` | OpenAI-compatible embedding API, key, model, and vector dimension. |
 | `lightrag.llm_*` | Independent OpenAI-compatible LLM API, key, and model used for entity and relationship extraction. |
 | `lightrag.graph_matches` | Number of entity and relationship matches included in graph retrieval context. |
 | `lightrag.chunk_matches` | Number of original document chunks included in text retrieval context. |
 
-LightRAG uses `lightrag.llm_*` for entity and relationship extraction. These settings are configured independently from each Agent model in `agents.*`. Both bundled Compose files pull `ghcr.io/yv1ing/postgres-for-rag:latest` and `ghcr.io/yv1ing/pgadmin4:latest` from GitHub Container Registry. The PostgreSQL image includes the pgvector and Apache AGE extensions required by LightRAG storage.
-
-The embedding API, model, and dimension define the knowledge collection's vector representation and should be selected before the first document import. Moving an existing collection to a different embedding model or dimension requires removing its indexed documents and importing them again. Embedding credentials, extraction LLM settings, and graph and document retrieval breadth can otherwise be managed independently through `System Config`.
+LightRAG uses `lightrag.llm_*` independently from the agent models in `agents.*`. Select the embedding API, model, and dimension before the first import; later changes may require rebuilding the indexed collection. Other retrieval and extraction settings can be managed through `System Config`.
 
 ### Start Containers
 
@@ -89,46 +89,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 ### Reverse Proxy (Optional)
 
-By default, the service listens on `0.0.0.0:8000`. You can configure it to listen on `127.0.0.1:8000` as needed and set up a reverse proxy.
-
-An example Nginx configuration is shown below:
-
-```text
-map $http_upgrade $connection_upgrade {
-    default upgrade;
-    '' close;
-}
-
-server {
-    listen 10000 ssl default_server;
-
-    ssl_certificate     /etc/nginx/ssl/vps.crt;
-    ssl_certificate_key /etc/nginx/ssl/vps.key;
-
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers off;
-
-    auth_basic "Origin Restricted";
-    auth_basic_user_file /etc/nginx/.htpasswd;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-
-        proxy_read_timeout 3600s;
-        proxy_send_timeout 3600s;
-        proxy_buffering off;
-    }
-}
-```
+By default, the service listens on `0.0.0.0:8000`. For public deployments, bind it to a trusted interface and place it behind a TLS-terminating reverse proxy that supports WebSocket upgrades and long-lived connections. Apply independent authentication and access controls at the proxy.
 
 ## Development Environment
 

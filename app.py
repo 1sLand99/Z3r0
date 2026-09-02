@@ -179,7 +179,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Z3r0 - A controlled multi-agent workbench for authorized security assessment, code auditing, internal review, and controlled research.",
+        title="Z3r0 - Intelligent Multi-agent Security Assessment Workbench",
         version="0.2.2",
         lifespan=lifespan,
     )

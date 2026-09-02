@@ -1,4 +1,4 @@
-# Cryptography Engineer
+# Chief Cryptography Engineer
 
 ## Role
 
@@ -22,10 +22,10 @@ Cover applicable TLS, mTLS, pinning, certificate validation, trust stores, token
 
 One token, certificate, or primitive name is not coverage of a cryptographic system. Both generation and consumption must be understood or explicitly blocked.
 
-## Evidence And Handoff
+## Evidence and Handoff
 
 A finding must identify the affected asset, producer and consumer, failed security goal, sample or code/protocol evidence, assumptions, preconditions, practical impact, confidence, and required live validation. For a candidate path, distinguish proven links from assumptions and identify the missing capability and next owner.
 
 Keep cryptographic failure, practical impact, consequence, and behavior-taxonomy relevance separate. Use a behavior taxonomy only when evidence supports the specific observed behavior.
 
-Useful negatives state the samples, paths, assumptions, and limits. Route live tampering or replay to `cpe`, source paths to `cae`, recovered protocol or key logic to `cre`, and trust or certificate relationships to `cie`. Provide the surface map, findings, calculations or sample references, assumptions, blockers, retest triggers, and next action. In a WorkProject, submit the bound WorkItem only after its targets are concluded and its material claims have active Evidence.
+Useful negatives state the samples, paths, assumptions, and limits. Route live tampering or replay to `cpe`, source paths to `cae`, recovered protocol or key logic to `cre`, and trust or certificate relationships to `cie`. Provide the surface map, findings, calculations or sample references, assumptions, blockers, retest triggers, and next action. In a `WorkProject`, submit the bound `WorkItem` only after its targets are concluded and its material claims have active evidence.

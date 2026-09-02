@@ -54,9 +54,9 @@ export function WorkProjectInfoModal({ open, projectId, initialTab = "overview",
                   <strong>{project.sandbox_container?.container_name ?? "-"}</strong>
                 </div>
                 <div className="project-info-state">
-                  <span>Operational State</span>
+                  <span>Operational state</span>
                   <strong>{project.untouched_asset_count} untouched assets</strong>
-                  <small>{project.active_work_item_count} active · {project.blocked_work_item_count} blocked</small>
+                  <small>{project.active_work_item_count} active work items · {project.blocked_work_item_count} blocked work items</small>
                 </div>
               </section>
               <WorkProjectMarkdown className="project-info-description" content={project.description} />

@@ -42,7 +42,7 @@ function defineRoute<TModule, TKey extends keyof TModule>(
 
 export const adminRoutes: readonly AdminRoute[] = [
   defineRoute(
-    { path: DEFAULT_ADMIN_PATH, label: "Playground", eyebrow: "Agent Workbench", icon: MessageSquareCode, adminOnly: false, navigation: true },
+    { path: DEFAULT_ADMIN_PATH, label: "Playground", eyebrow: "Intelligent Multi-agent Security Assessment Workbench", icon: MessageSquareCode, adminOnly: false, navigation: true },
     () => import("../features/playground/PlaygroundPage"),
     "PlaygroundPage",
   ),

@@ -25,7 +25,7 @@ const enSidebar = {
 export default defineConfig({
   base,
   title: 'Z3r0 Documentation',
-  description: 'AI-assisted security assessment workbench for authorized testing and technical research, with specialist agents, sandboxed tooling, evidence records, and replayable timelines.',
+  description: 'Open-source multi-agent security assessment workbench for intelligent, operator-guided automation of authorized penetration testing, vulnerability discovery, code auditing, and technical research, with specialist agents, sandboxed tooling, evidence records, and replayable timelines.',
   appearance: 'force-dark',
   lastUpdated: true,
   head: [

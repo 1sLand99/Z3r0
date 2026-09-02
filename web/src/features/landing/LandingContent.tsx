@@ -28,7 +28,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  EGRESS_PROXY_TYPE_VALUES,
   SANDBOX_CONTAINER_EGRESS_MODE,
 } from "../../shared/api/generated/constants";
 import { cx } from "../../shared/lib/className";
@@ -37,7 +36,7 @@ import { landingDocsOverviewUrl, landingRepositoryUrl } from "./landingConfig";
 
 const egressModes = [
   formatEnumLabel(SANDBOX_CONTAINER_EGRESS_MODE.DIRECT),
-  ...EGRESS_PROXY_TYPE_VALUES.map((type) => type.toUpperCase()),
+  "Proxy (HTTP / HTTPS / SOCKS5)",
   formatEnumLabel(SANDBOX_CONTAINER_EGRESS_MODE.TOR),
 ];
 
@@ -77,28 +76,28 @@ type AgentItem = {
 
 const planes: CardItem[] = [
   {
-    title: "Control Plane",
+    title: "Control plane",
     kicker: "FastAPI",
-    text: "Manages authenticated resources for users, sessions, WorkProjects, Knowledges, managed hosts, sandbox images, containers, egress proxies, and system configuration.",
+    text: "Manages authenticated resources for users, sessions, work projects, Knowledges, managed hosts, sandbox images, containers, egress proxies, and system configuration.",
     icon: Braces,
     items: ["Identity and access", "Resource administration", "Session entry"],
   },
   {
-    title: "Runtime Plane",
-    kicker: "Agent sessions",
-    text: "Coordinates lead and specialist Agents around project scope, assignments, and evidence, enriches work with LightRAG context, and preserves continuity across long-running assessments.",
+    title: "Runtime plane",
+    kicker: "agent sessions",
+    text: "Coordinates lead and specialist agents around project scope, assignments, and evidence, enriches work with LightRAG context, and preserves continuity across long-running assessments.",
     icon: Workflow,
-    items: ["Session runtime", "Agent graph", "Replayable timeline"],
+    items: ["Session runtime", "agent graph", "Replayable timeline"],
   },
   {
-    title: "Evidence Plane",
-    kicker: "WorkProject",
-    text: "Connects authorized scope, asset relationships, WorkItem-attributed evidence, findings, assessment paths, and review gates in one durable operating record.",
+    title: "Evidence plane",
+    kicker: "Work project",
+    text: "Connects authorized scope, asset relationships, work-item-attributed evidence, findings, attack paths, and review gates in one durable operating record.",
     icon: FileCheck2,
-    items: ["Asset graph", "Evidence chain", "Workflow and paths"],
+    items: ["Asset graph", "Evidence chain", "Workflow and attack paths"],
   },
   {
-    title: "Execution Plane",
+    title: "Execution plane",
     kicker: "Sandbox pool",
     text: "Provides isolated Docker-based execution with shell, files, noVNC/browser review, command execution, sandbox-local skills, a preloaded security toolchain, and container-level outbound network policy.",
     icon: SquareTerminal,
@@ -124,7 +123,7 @@ const runtimePath: CardItem[] = [
   },
   {
     title: "Retrieval context",
-    text: "For task-oriented inputs, LightRAG retrieves matching original document chunks and graph context before Agent execution.",
+    text: "For task-oriented inputs, LightRAG retrieves matching original document chunks and graph context before agent execution.",
     icon: Database,
   },
   {
@@ -138,14 +137,14 @@ const evidenceNodes: CardItem[] = [
   { title: "Authorized scope", text: "Declared assets and explicit testing boundaries", icon: ShieldCheck },
   { title: "Asset graph", text: "Environment structure, connectivity, trust, and dependency", icon: GitBranch },
   { title: "Graph-targeted work", text: "Coordinated assignments connect specialists, graph assets, test surfaces, and review outcomes", icon: ClipboardCheck },
-  { title: "Evidence", text: "Immutable observations remain attributed to the WorkItem and reproducible source", icon: FileCheck2 },
-  { title: "Security conclusions", text: "Findings separate validation state, impact, and disposition", icon: FileSearch },
-  { title: "Assessment paths", text: "Evidence-backed steps document exposure and impact boundaries", icon: Route },
+  { title: "Evidence", text: "Immutable observations remain attributed to the work item and reproducible source", icon: FileCheck2 },
+  { title: "Security conclusions", text: "Findings separate verification state, impact, and resolution", icon: FileSearch },
+  { title: "Attack paths", text: "Evidence-backed steps document exposure and impact boundaries", icon: Route },
 ];
 
 const workbenchSurfaces: CardItem[] = [
-  { title: "Playground", text: "Live transcript, Agent selection, streaming state, subagent panel, and sandbox actions.", icon: Activity },
-  { title: "Work Projects", text: "Searchable scope coverage, graph-targeted workflow, evidence chains, findings, assessment paths, retest candidates, and decision activity.", icon: FolderKanban },
+  { title: "Playground", text: "Live transcript, agent selection, streaming state, subagent panel, and sandbox actions.", icon: Activity },
+  { title: "Work Projects", text: "Searchable scope coverage, graph-targeted workflow, evidence chains, findings, attack paths, retest candidates, and decision activity.", icon: FolderKanban },
   { title: "Knowledges", text: "Parallel document ingestion, vector inspection, semantic retrieval, and progressive knowledge graph exploration.", icon: Database },
   { title: "Host Management", text: "Docker host inventory for distributing sandbox workloads across managed infrastructure.", icon: Server },
   { title: "Egress Proxies", text: "Managed HTTP, HTTPS, and SOCKS5 upstreams for container-level outbound routing.", icon: Network },
@@ -193,12 +192,12 @@ const sandboxToolchain: CardItem[] = [
 ];
 
 const agents: AgentItem[] = [
-  { code: "cso", name: "Z3r0", role: "Chief Security Lead", detail: "Task decomposition, team coordination, result integration.", icon: Workflow },
-  { code: "cae", name: "V3ra", role: "Code Audit Engineer", detail: "Source code auditing, dependency review, remediation verification.", icon: ClipboardCheck },
-  { code: "cie", name: "L1ly", role: "Intelligence Gathering Engineer", detail: "Intelligence gathering, asset discovery, relationship mapping.", icon: FileSearch },
+  { code: "cso", name: "Z3r0", role: "Chief Security Officer", detail: "Task decomposition, team coordination, result integration.", icon: Workflow },
+  { code: "cae", name: "V3ra", role: "Chief Audit Engineer", detail: "Source code auditing, dependency review, remediation verification.", icon: ClipboardCheck },
+  { code: "cie", name: "L1ly", role: "Chief Intelligence Engineer", detail: "Intelligence gathering, asset discovery, relationship mapping.", icon: FileSearch },
   { code: "cpe", name: "Fr4nk", role: "Chief Penetration Engineer", detail: "Authorized testing, vulnerability validation, impact confirmation.", icon: ShieldCheck },
-  { code: "cre", name: "J4m3", role: "Reverse Analysis Engineer", detail: "Reverse analysis, firmware disassembly, binary unpacking.", icon: Code2 },
-  { code: "cce", name: "Nu1L", role: "Cryptography Engineer", detail: "Cryptographic analysis, key review, security assessment.", icon: LockKeyhole },
+  { code: "cre", name: "J4m3", role: "Chief Reverse Engineer", detail: "Reverse analysis, firmware disassembly, binary unpacking.", icon: Code2 },
+  { code: "cce", name: "Nu1L", role: "Chief Cryptography Engineer", detail: "Cryptographic analysis, key review, security assessment.", icon: LockKeyhole },
 ];
 
 export function LandingContent({ logoSrc, primaryAction }: LandingContentProps) {
@@ -210,8 +209,8 @@ export function LandingContent({ logoSrc, primaryAction }: LandingContentProps) 
       <section className="landing-hero" aria-label="Z3r0 landing page">
         <div className="landing-hero-copy">
           <img className="landing-hero-logo" src={logoSrc} width="1000" height="1000" alt="Z3r0 logo" />
-          <span className="page-eyebrow">Open-source security assessment workbench</span>
-          <p>A control-plane-oriented platform for authorized testing, vulnerability analysis, code auditing, and technical research.</p>
+          <span className="page-eyebrow">Open-source intelligent multi-agent security assessment workbench</span>
+          <p>Intelligent, operator-guided automation for authorized security assessment, penetration testing, vulnerability discovery, code auditing, and technical research.</p>
           <div className="landing-actions">
             <ActionLink action={primaryAction} primary />
             <ActionLink action={{ label: "GitHub", href: landingRepositoryUrl, external: true }} icon={GitBranch} ghost />
@@ -223,7 +222,7 @@ export function LandingContent({ logoSrc, primaryAction }: LandingContentProps) 
       <Section
         eyebrow="Architecture planes"
         title="The system separates management, runtime, evidence, and execution concerns."
-        description="The architecture connects authenticated administration, Agent collaboration, durable WorkProject evidence, managed sandbox infrastructure, and PostgreSQL persistence."
+        description="The architecture connects authenticated administration, agent collaboration, durable work project evidence, managed sandbox infrastructure, and PostgreSQL persistence."
       >
         <div className="landing-card-grid landing-card-grid-4">
           {planes.map((item) => <Card key={item.title} item={item} accent />)}
@@ -238,7 +237,7 @@ export function LandingContent({ logoSrc, primaryAction }: LandingContentProps) 
 
       <Section
         eyebrow="Evidence model"
-        title="WorkProject carries each engagement from authorized scope to evidence-backed assessment paths."
+        title="A work project carries each engagement from authorized scope to evidence-backed attack paths."
         description="Specialists work from graph-targeted assignments with the surrounding assets and evidence in view. Attributed observations support environment relations, security findings, and validated path steps, while the lead reviews conclusions and directs follow-up work."
       >
         <div className="landing-card-grid landing-card-grid-6">
@@ -251,8 +250,8 @@ export function LandingContent({ logoSrc, primaryAction }: LandingContentProps) 
           <SandboxNetworkMap />
           <div className="landing-panel landing-topology-copy">
             <h3>Sandbox resources provide a managed execution boundary.</h3>
-            <p>Operators and Agents work through selected running containers. The same boundary supports command execution, Shell, files, browser/noVNC review, sandbox-local skills, preloaded security tooling, and container-level network identity.</p>
-            <p>Egress policy is applied inside the container through a local proxy and can be routed directly, through managed HTTP, HTTPS, and SOCKS5 upstreams, or through Tor.</p>
+            <p>Operators and agents work through selected running containers. The same boundary supports command execution, shell, files, browser/noVNC review, sandbox-local skills, preloaded security tooling, and container-level network identity.</p>
+            <p>Egress policy is applied inside the container through a local proxy and can use direct access, a managed proxy with HTTP, HTTPS, or SOCKS5 upstreams, or Tor.</p>
           </div>
         </div>
       </Section>
@@ -279,10 +278,10 @@ export function LandingContent({ logoSrc, primaryAction }: LandingContentProps) 
         </div>
       </Section>
 
-      <Section className="landing-security" eyebrow="Operational boundary" title="Authorized use only.">
+      <Section className="landing-security" eyebrow="Operational boundary" title="Keep work within the active project scope.">
         <div className="landing-panel landing-boundary">
-          <p>Use Z3r0 only for lawful security assessment, risk analysis, code auditing, or technical research within a documented scope and with prior written authorization from the system owner or engagement authority covering assets, methods, timing, data handling, monitoring, stop conditions, and cleanup. Obtain separate approval for production systems, personal data, credentials, and third-party services.</p>
-          <p>Z3r0 grants no access rights or testing authority. Any unauthorized, unlawful, or malicious attack, intrusion, compromise, disruption, or data activity is strictly prohibited. Do not exceed scope, bypass safeguards, or collect or alter data without approval. Users bear sole responsibility for applicable law and contracts; <strong>The author and maintainers accept no responsibility for any damage, loss, claim, or legal liability arising from user deployment, configuration, instructions, conduct, or unauthorized use.</strong></p>
+          <p>Z3r0 assumes that user-provided objectives, targets, and instructions are lawfully authorized for the active engagement. It grants no additional access rights; the active project scope and runtime controls define execution boundaries.</p>
+          <p>Keep actions bounded and non-destructive: prefer read-only checks, least-privilege identities, synthetic data, conservative rates, and the narrowest proof needed. Operators remain responsible for applicable law and contracts; <strong>the author and maintainers accept no responsibility for damage, loss, claims, or liability arising from user deployment, configuration, instructions, conduct, or misuse.</strong></p>
           <a className="landing-inline-link" href={landingDocsOverviewUrl} target="_blank" rel="noopener noreferrer">
             Read the documentation
             <ArrowRight size={16} />
@@ -393,7 +392,7 @@ function OperationMeshPanel() {
                 <div className="landing-ops-specialist" key={code} title={role}>
                   <Icon size={16} />
                   <strong>{code}</strong>
-                  <span>{role.replace(" Engineer", "")}</span>
+                  <span>{role}</span>
                 </div>
               ))}
             </div>
@@ -430,7 +429,7 @@ function SandboxNetworkMap() {
           <div className="landing-network-primary-node">
             <FolderKanban size={20} />
             <strong>Project session</strong>
-            <span>Operator + Agent team</span>
+            <span>Operator + agent team</span>
           </div>
           <div className="landing-network-tags">
             <span>Scoped</span>
@@ -460,7 +459,7 @@ function SandboxNetworkMap() {
           </div>
         </div>
 
-        <NetworkConnector label="policy" />
+        <NetworkConnector label="Policy" />
 
         <div className="landing-network-egress">
           <span className="landing-network-kicker">Egress</span>

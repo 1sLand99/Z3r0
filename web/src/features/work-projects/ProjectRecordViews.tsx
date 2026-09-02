@@ -260,12 +260,12 @@ function ProjectRecordTabs({ projectId, initialTab = "overview", className }: Pr
           <FindingList records={findings.items} />
         </Paged>
       </TabPane>
-      <TabPane tab={<TabLabel icon={<Route size={14} />} text="Assessment Paths" />} itemKey="attack-paths">
+      <TabPane tab={<TabLabel icon={<Route size={14} />} text="Attack Paths" />} itemKey="attack-paths">
         <Paged
           state={paths}
           emptyIcon={<Route size={42} />}
-          emptyTitle="No assessment paths."
-          toolbar={<RecordQueryBar state={paths} placeholder="Search assessment paths" />}
+          emptyTitle="No attack paths."
+          toolbar={<RecordQueryBar state={paths} placeholder="Search attack paths" />}
         >
           <AttackPathList records={paths.items} />
         </Paged>
@@ -362,9 +362,9 @@ function OverviewView({ value }: { value: WorkProjectOverview }) {
         {metrics.map(([label, count]) => <div key={label}><span>{label}</span><strong>{count}</strong></div>)}
       </div>
       <div className="project-overview-buckets">
-        <StateBuckets title="Work Items" values={value.work_item_status_counts} labels={WORK_PROJECT_WORK_ITEM_STATUS_LABEL} />
+        <StateBuckets title="Work items" values={value.work_item_status_counts} labels={WORK_PROJECT_WORK_ITEM_STATUS_LABEL} />
         <StateBuckets title="Findings" values={value.finding_verification_counts} labels={WORK_PROJECT_FINDING_VERIFICATION_LABEL} />
-        <StateBuckets title="Assessment Paths" values={value.attack_path_status_counts} labels={WORK_PROJECT_ATTACK_PATH_STATUS_LABEL} />
+        <StateBuckets title="Attack paths" values={value.attack_path_status_counts} labels={WORK_PROJECT_ATTACK_PATH_STATUS_LABEL} />
       </div>
     </div>
   );

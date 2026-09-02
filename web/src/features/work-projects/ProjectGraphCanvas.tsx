@@ -35,9 +35,9 @@ const RELATION_CATEGORY_COLOR: Record<WorkProjectRelationCategory, string> = {
   provenance: "#a78bfa",
 };
 const RECORD_SIGNALS = [
-  ["Active work", "#42d6c5"],
+  ["Active work items", "#42d6c5"],
   ["Findings", "#ff7d8a"],
-  ["Assessment paths", "#a78bfa"],
+  ["Attack paths", "#a78bfa"],
 ] as const;
 
 const FIT_PADDING = 84;
@@ -468,9 +468,9 @@ function nodeRows(asset: WorkProjectAsset, recordCounts: AssetRecordCounts): Too
     ["Origin", WORK_PROJECT_ASSET_ORIGIN_LABEL[asset.origin]],
     ["Scope", WORK_PROJECT_ASSET_SCOPE_LABEL[asset.scope]],
     ["Locator", asset.locator],
-    ["Active WorkItems", formatRecordCount(recordCounts.activeWorkItems[asset.id])],
+    ["Active work items", formatRecordCount(recordCounts.activeWorkItems[asset.id])],
     ["Findings", formatRecordCount(recordCounts.findings[asset.id])],
-    ["Assessment Paths", formatRecordCount(recordCounts.attackPaths[asset.id])],
+    ["Attack paths", formatRecordCount(recordCounts.attackPaths[asset.id])],
     ["Summary", asset.summary, true],
   ];
   return { title: formatWorkProjectAsset(asset), items: filledDetailItems(items) };
